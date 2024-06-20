@@ -1,6 +1,16 @@
 import bpy, json
 from dataclasses import dataclass, asdict, field
 
+# This creates metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
+# https://github.com/ucupumar/ucupaint
+
+# This will find any Ucupaint group nodes and read default inputs from it.
+# It will then look inside the group and read any textures from it.
+# It will then look at any top level image texture nodes / value nodes and read them if they start with "Param_"
+# or if they are one of the node wrangler names ["Base Color", "Roughness", "Metallic", "Normal", "Alpha"]
+
+# Only Principled BSDF materials are supported for non-Ucupaint values on the main shader node.
+
 metadata_name = "unreal_metadata"
 input_prefix = "Param_"
 node_wrangler_textures = [
@@ -17,14 +27,6 @@ node_wrangler_textures = [
     "Alpha",
     "Ambient Occlusion",
 ]
-
-# This creates metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
-# https://github.com/ucupumar/ucupaint
-
-# This will find any Ucupaint group nodes and read default inputs from it.
-# It will then look inside the group and read any textures from it.
-# It will then look at any top level image texture nodes / value nodes and read them if they start with "Param_"
-# or if they are one of the node wrangler names ["Base Color", "Roughness", "Metallic", "Normal", "Alpha"]
 
 def unreal_name(name : str) -> str:
     return name.replace(" ", "_").rsplit(".", 1)[0] # remove file extension
@@ -143,6 +145,24 @@ class MaterialMetadata():
             elif node.type == "VALUE" and node.label.find(input_prefix) == 0:
                 scalarInput = MaterialMetadata.get_scalar(scalarInputs, node.label[len(input_prefix):]) 
                 scalarInput.default = node.outputs[0].default_value
+                
+            elif node.type == "BSDF_PRINCIPLED":
+                if len(node.inputs["Base Color"].links) == 0:
+                    MaterialMetadata.get_vector(vectorInputs, "Color").default = list(node.inputs["Base Color"].default_value)
+                if len(node.inputs["Metallic"].links) == 0:
+                    MaterialMetadata.get_scalar(scalarInputs, "Metallic").default = node.inputs["Metallic"].default_value
+                if len(node.inputs["Roughness"].links) == 0:
+                    MaterialMetadata.get_scalar(scalarInputs, "Roughness").default = node.inputs["Roughness"].default_value
+                if len(node.inputs["Alpha"].links) == 0:
+                    MaterialMetadata.get_scalar(scalarInputs, "Alpha").default = node.inputs["Alpha"].default_value
+                if len(node.inputs["Normal"].links) == 0:
+                    MaterialMetadata.get_vector(vectorInputs, "Normal").default = default_vector()
+                if len(node.inputs["Specular IOR Level"].links) == 0:
+                    MaterialMetadata.get_scalar(scalarInputs, "Specular").default = node.inputs["Specular IOR Level"].default_value
+                if len(node.inputs["Emission Color"].links) == 0:
+                    MaterialMetadata.get_vector(vectorInputs, "Emission").default = list(node.inputs["Emission Color"].default_value)
+                if len(node.inputs["Emission Strength"].links) == 0:
+                    MaterialMetadata.get_scalar(scalarInputs, "Emission Strength").default = node.inputs["Emission Strength"].default_value
         
         return MaterialMetadata(name, scalarInputs, vectorInputs)
     
