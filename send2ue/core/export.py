@@ -6,6 +6,7 @@ import os
 import bpy
 from . import utilities, validations, settings, ingest, extension, io
 from ..constants import BlenderTypes, UnrealTypes, FileTypes, PreFixToken, ToolInfo, ExtensionTasks
+from . import metadata
 
 
 def get_file_path(asset_name, properties, asset_type, lod=False, file_extension='fbx'):
@@ -174,11 +175,15 @@ def export_file(properties, lod=0, file_type=FileTypes.FBX):
         for attribute_name in group_data.keys():
             export_settings[attribute_name] = settings.get_property_by_path(prefix, attribute_name, properties)
 
+    metadata.assign_custom_metadata()
+
     if file_type == FileTypes.FBX:
         export_fbx_file(file_path, export_settings)
 
     elif file_type == FileTypes.ABC:
         export_alembic_file(file_path, export_settings)
+        
+    metadata.delete_custom_metadata()
 
 
 def get_asset_sockets(asset_name, properties):
