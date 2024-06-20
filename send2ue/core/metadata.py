@@ -2,6 +2,21 @@ import bpy, json
 from dataclasses import dataclass, asdict, field
 
 metadata_name = "unreal_metadata"
+input_prefix = "Param_"
+node_wrangler_textures = [
+    "Base Color", # gets converted to "Color" (for Ucupaint consistency) in metadata, see below
+    "Metallic",
+    "Specular",
+    "Roughness",
+    "Gloss",
+    "Normal",
+    "Bump",
+    "Displacement",
+    "Transmission",
+    "Emission",
+    "Alpha",
+    "Ambient Occlusion",
+]
 
 # This creates metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
 # https://github.com/ucupumar/ucupaint
@@ -11,50 +26,126 @@ metadata_name = "unreal_metadata"
 # It will then look at any top level image texture nodes / value nodes and read them if they start with "Param_"
 # or if they are one of the node wrangler names ["Base Color", "Roughness", "Metallic", "Normal", "Alpha"]
 
+def unreal_name(name : str) -> str:
+    return name.replace(" ", "_").rsplit(".", 1)[0] # remove file extension
+
+def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
+    imageDict = {}
+    for node in node_tree.nodes:
+        if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked ":
+            imageDict[node.label[len("Baked "):]] = node
+    return imageDict
+
 def default_vector():
     return [0,0,0,0]
 
 @dataclass
 class ScalarInputMetadata():
     default : float = 0
-    path : str = ""
+    texture_name : str = ""
      
 @dataclass
 class VectorInputMetadata():
     default : list[float] = field(default_factory = default_vector)
-    path : str = "" 
+    texture_name : str = "" 
     
 @dataclass
 class MaterialMetadata():
-    #color_value : list[float] = [0,0,0,0]
-    #roughness_value : float = 0
-    #metallic_value : float = 0
-    #    
-    #use_color_value : bool = False
-    #use_roughness_value : bool = False
-    #use_metallic_value : bool = False
-    #    
-    #color : str = ""
-    #roughness : str = ""
-    #normal : str = ""
-    
     name : str
-    
-    color : VectorInputMetadata
-    roughness : ScalarInputMetadata
-    metallic : ScalarInputMetadata
-    normal : VectorInputMetadata
     
     scalarInputs : dict[str, ScalarInputMetadata]
     vectorInputs : dict[str, VectorInputMetadata]
     
     @staticmethod
-    def create_material_metadata(material : bpy.types.Material):
-        return material.name
-        #name = material.name
-        #color = VectorInputMetadata()
-        #return MaterialMetadata()
-
+    def get_scalar(scalarInputs : dict[str, ScalarInputMetadata], label : str) -> ScalarInputMetadata:
+        if label in scalarInputs:
+            return scalarInputs[label]
+        else:
+            scalarInput = ScalarInputMetadata()
+            scalarInputs[label] = scalarInput
+            return scalarInput
+    
+    @staticmethod
+    def get_vector(vectorInputs : dict[str, VectorInputMetadata], label : str) -> VectorInputMetadata:
+        if label in vectorInputs:
+            return vectorInputs[label]
+        else:
+            vectorInput = VectorInputMetadata()
+            vectorInputs[label] = vectorInput
+            return vectorInput
+    
+    @staticmethod
+    def create_material_metadata(material : bpy.types.Material) -> 'MaterialMetadata':
+        name = material.name
+        scalarInputs : dict[str, ScalarInputMetadata] = {}
+        vectorInputs : dict[str, VectorInputMetadata] = {}
+        
+        for node in material.node_tree.nodes:
+            # Find Ucupaint group
+            if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked: 
+                
+                # Handle default Ucupaint channels
+                MaterialMetadata.get_vector(vectorInputs, "Color").default = list(node.inputs["Color"].default_value)
+                MaterialMetadata.get_scalar(scalarInputs, "Metallic").default = node.inputs["Metallic"].default_value
+                MaterialMetadata.get_scalar(scalarInputs, "Roughness").default = node.inputs["Roughness"].default_value
+                MaterialMetadata.get_vector(vectorInputs, "Normal").default = default_vector()
+                # ignore normal height input
+                
+                # Handle custom Ucupaint channels
+                # This assumes Ucupaint inputs start adding custom inputs at index 5.
+                for i in range(5, len(node.inputs)):
+                    input = node.inputs[i]
+                    if input.type == "RGBA" or input.type == "VECTOR":
+                        MaterialMetadata.get_vector(vectorInputs, input.name).default = input.default_value
+                    elif input.type == "VALUE":
+                        MaterialMetadata.get_scalar(scalarInputs, input.name).default = input.default_value
+                    else:
+                        print(f"Skipping input: {input.name}\n")
+                
+                # Handle Ucupaint baked images
+                for channel, image_node in get_baked_images(node.node_tree).items():
+                    if len(image_node.outputs[0].links) > 0:
+                        socket_type = image_node.outputs[0].links[0].to_socket.type
+                        image_name = unreal_name(image_node.image.name[len("Ucupaint "):])
+                        if socket_type == "RGBA" or socket_type == "VECTOR":
+                            MaterialMetadata.get_vector(vectorInputs, channel).texture_name = image_name
+                        elif socket_type == "VALUE":
+                            MaterialMetadata.get_scalar(scalarInputs, channel).texture_name = image_name
+                        else:
+                           print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
+                    else:
+                        print(f"Baked image {image_node.label} not connected to an output, skipping.\n")
+            
+            # Handle node wrangler / flagged texture nodes
+            elif node.type == "TEX_IMAGE":
+                if node.label in node_wrangler_textures or node.label.find(input_prefix) == 0:
+                    if node.label in node_wrangler_textures:
+                        label = node.label if node.label != "Base Color" else "Color"
+                    else:
+                        label = node.label[len(input_prefix):]
+                    image_name = unreal_name(node.image.name)
+                    if len(node.outputs[0].links) > 0:
+                        socket_type = node.outputs[0].links[0].to_socket.type
+                        if socket_type == "RGBA" or socket_type == "VECTOR":
+                            MaterialMetadata.get_vector(vectorInputs, label).texture_name = image_name
+                        elif socket_type == "VALUE":
+                            MaterialMetadata.get_scalar(scalarInputs, label).texture_name = image_name
+                        else:
+                           print(f"Skipping image due to invalid output connection: {image_node.label}\n")
+                    else:
+                        print(f"Image {image_node.label} not connected to an output, skipping.\n")
+            
+            # Handle flagged color/value constants
+            elif node.type == "RGB" and node.label.find(input_prefix) == 0:
+                vectorInput = MaterialMetadata.get_vector(vectorInputs, node.label[len(input_prefix):]) 
+                vectorInput.default = list(node.outputs[0].default_value)
+            
+            elif node.type == "VALUE" and node.label.find(input_prefix) == 0:
+                scalarInput = MaterialMetadata.get_scalar(scalarInputs, node.label[len(input_prefix):]) 
+                scalarInput.default = node.outputs[0].default_value
+        
+        return MaterialMetadata(name, scalarInputs, vectorInputs)
+    
 dataclasses = [
     MaterialMetadata,
     VectorInputMetadata,
@@ -67,7 +158,7 @@ class MetadataEncoder(json.JSONEncoder):
             return asdict(o)
         return super().default(o)
 
-def get_mesh_objs():
+def get_mesh_objs() -> list[bpy.types.Object]:
     return [obj for obj in bpy.data.collections['Export'].objects if obj.type == "MESH"]
 
 def assign_custom_metadata():
