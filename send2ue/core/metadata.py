@@ -84,39 +84,33 @@ class MaterialMetadata():
         
         for node in material.node_tree.nodes:
             # Find Ucupaint group
-            if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked: 
+            if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0: 
                 
-                # Handle default Ucupaint channels
-                MaterialMetadata.get_vector(vectorInputs, "Color").default = list(node.inputs["Color"].default_value)
-                MaterialMetadata.get_scalar(scalarInputs, "Metallic").default = node.inputs["Metallic"].default_value
-                MaterialMetadata.get_scalar(scalarInputs, "Roughness").default = node.inputs["Roughness"].default_value
-                MaterialMetadata.get_vector(vectorInputs, "Normal").default = default_vector()
-                # ignore normal height input
-                
-                # Handle custom Ucupaint channels
+                # Handle Ucupaint channels
                 # This assumes Ucupaint inputs start adding custom inputs at index 5.
-                for i in range(5, len(node.inputs)):
+                for i in range(len(node.inputs)):
                     input = node.inputs[i]
                     if input.type == "RGBA" or input.type == "VECTOR":
-                        MaterialMetadata.get_vector(vectorInputs, input.name).default = input.default_value
+                        MaterialMetadata.get_vector(vectorInputs, input.name).default = list(input.default_value)
                     elif input.type == "VALUE":
                         MaterialMetadata.get_scalar(scalarInputs, input.name).default = input.default_value
                     else:
                         print(f"Skipping input: {input.name}\n")
                 
-                # Handle Ucupaint baked images
-                for channel, image_node in get_baked_images(node.node_tree).items():
-                    if len(image_node.outputs[0].links) > 0:
-                        socket_type = image_node.outputs[0].links[0].to_socket.type
-                        image_name = unreal_name(image_node.image.name[len("Ucupaint "):])
-                        if socket_type == "RGBA" or socket_type == "VECTOR":
-                            MaterialMetadata.get_vector(vectorInputs, channel).texture_name = image_name
-                        elif socket_type == "VALUE":
-                            MaterialMetadata.get_scalar(scalarInputs, channel).texture_name = image_name
+                if node.node_tree.yp.use_baked:
+                    # Handle Ucupaint baked images
+                    for channel, image_node in get_baked_images(node.node_tree).items():
+                        if len(image_node.outputs[0].links) > 0:
+                            socket_type = image_node.outputs[0].links[0].to_socket.type
+                            image_name = unreal_name(image_node.image.name[len("Ucupaint "):])
+                            if socket_type == "RGBA" or socket_type == "VECTOR":
+                                MaterialMetadata.get_vector(vectorInputs, channel).texture_name = image_name
+                            elif socket_type == "VALUE":
+                                MaterialMetadata.get_scalar(scalarInputs, channel).texture_name = image_name
+                            else:
+                               print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
                         else:
-                           print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
-                    else:
-                        print(f"Baked image {image_node.label} not connected to an output, skipping.\n")
+                            print(f"Baked image {image_node.label} not connected to an output, skipping.\n")
             
             # Handle node wrangler / flagged texture nodes
             elif node.type == "TEX_IMAGE":
