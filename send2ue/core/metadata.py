@@ -14,7 +14,7 @@ from dataclasses import dataclass, asdict, field
 metadata_name = "unreal_metadata"
 input_prefix = "Param_"
 node_wrangler_textures = [
-    "Base Color", # gets converted to "Color" (for Ucupaint consistency) in metadata, see below
+    "Base Color",
     "Metallic",
     "Specular",
     "Roughness",
@@ -87,15 +87,15 @@ class MaterialMetadata():
             if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0: 
                 
                 # Handle Ucupaint channels
-                # This assumes Ucupaint inputs start adding custom inputs at index 5.
                 for i in range(len(node.inputs)):
                     input = node.inputs[i]
+                    input_name = input.name if input.name != "Color" else "Base Color" # Make consistent with Principled BSDF
                     if input.type == "RGBA" or input.type == "VECTOR":
-                        MaterialMetadata.get_vector(vectorInputs, input.name).default = list(input.default_value)
+                        MaterialMetadata.get_vector(vectorInputs, input_name).default = list(input.default_value)
                     elif input.type == "VALUE":
-                        MaterialMetadata.get_scalar(scalarInputs, input.name).default = input.default_value
+                        MaterialMetadata.get_scalar(scalarInputs, input_name).default = input.default_value
                     else:
-                        print(f"Skipping input: {input.name}\n")
+                        print(f"Skipping input: {input_name}\n")
                 
                 if node.node_tree.yp.use_baked:
                     # Handle Ucupaint baked images
@@ -116,7 +116,7 @@ class MaterialMetadata():
             elif node.type == "TEX_IMAGE":
                 if node.label in node_wrangler_textures or node.label.find(input_prefix) == 0:
                     if node.label in node_wrangler_textures:
-                        label = node.label if node.label != "Base Color" else "Color"
+                        label = node.label
                     else:
                         label = node.label[len(input_prefix):]
                     image_name = unreal_name(node.image.name)
@@ -142,7 +142,7 @@ class MaterialMetadata():
                 
             elif node.type == "BSDF_PRINCIPLED":
                 if len(node.inputs["Base Color"].links) == 0:
-                    MaterialMetadata.get_vector(vectorInputs, "Color").default = list(node.inputs["Base Color"].default_value)
+                    MaterialMetadata.get_vector(vectorInputs, "Base Color").default = list(node.inputs["Base Color"].default_value)
                 if len(node.inputs["Metallic"].links) == 0:
                     MaterialMetadata.get_scalar(scalarInputs, "Metallic").default = node.inputs["Metallic"].default_value
                 if len(node.inputs["Roughness"].links) == 0:
