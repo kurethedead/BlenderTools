@@ -11,7 +11,7 @@ from dataclasses import dataclass, asdict, field
 
 # Only Principled BSDF materials are supported for non-Ucupaint values on the main shader node.
 
-METADATA_NAME = "unreal_metadata"
+METADATA_NAME = "blender_metadata"
 INPUT_PREFIX = "Param_"
 NODE_WRANGLER_TEXTURES = [
     "Base Color",
@@ -28,8 +28,18 @@ NODE_WRANGLER_TEXTURES = [
     "Ambient Occlusion",
 ]
 
-def unreal_name(name : str) -> str:
-    return name.replace(" ", "_").rsplit(".", 1)[0] # remove file extension
+INVALID_FILENAME_CHARS = "!@#$%^&*()=[]\\:;\"\'<,>./? "
+
+def unreal_image_name(name : str) -> str:
+    name = name.rsplit(".", 1)[0] # remove file extension
+    for c in INVALID_FILENAME_CHARS:
+        name = name.replace(c, "_")
+    return name
+
+def unreal_material_name(name : str) -> str:
+    for c in INVALID_FILENAME_CHARS:
+        name = name.replace(c, "_")
+    return name
 
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
     image_dict = {}
@@ -102,7 +112,7 @@ class MaterialMetadata():
                     for channel, image_node in get_baked_images(node.node_tree).items():
                         if len(image_node.outputs[0].links) > 0:
                             socket_type = image_node.outputs[0].links[0].to_socket.type
-                            image_name = unreal_name(image_node.image.name[len("Ucupaint "):])
+                            image_name = unreal_image_name(image_node.image.name[len("Ucupaint "):])
                             if socket_type == "RGBA" or socket_type == "VECTOR":
                                 MaterialMetadata.get_vector(vector_inputs, channel).texture_name = image_name
                             elif socket_type == "VALUE":
@@ -119,7 +129,7 @@ class MaterialMetadata():
                         label = node.label
                     else:
                         label = node.label[len(INPUT_PREFIX):]
-                    image_name = unreal_name(node.image.name)
+                    image_name = unreal_image_name(node.image.name)
                     if len(node.outputs[0].links) > 0:
                         socket_type = node.outputs[0].links[0].to_socket.type
                         if socket_type == "RGBA" or socket_type == "VECTOR":
@@ -160,7 +170,7 @@ class MaterialMetadata():
         
         return MaterialMetadata(name, scalar_inputs, vector_inputs)
     
-dataclasses = [
+DATACLASSES = [
     MaterialMetadata,
     VectorInputMetadata,
     ScalarInputMetadata
@@ -168,7 +178,7 @@ dataclasses = [
  
 class MetadataEncoder(json.JSONEncoder):
     def default(self, o):
-        if type(o) in dataclasses:
+        if type(o) in DATACLASSES:
             return asdict(o)
         return super().default(o)
 
@@ -178,12 +188,12 @@ def get_mesh_objs() -> list[bpy.types.Object]:
 def assign_custom_metadata():
     for obj in get_mesh_objs():
         metadata = {
-            "materials" : []
+            "materials" : {}
         }
         
         for i in range(len(obj.material_slots)):
             material = obj.material_slots[i].material
-            metadata["materials"].append(MaterialMetadata.create_material_metadata(material))
+            metadata["materials"][unreal_material_name(material.name)] = MaterialMetadata.create_material_metadata(material)
             
         obj[METADATA_NAME] = json.dumps(metadata, cls = MetadataEncoder)
 
