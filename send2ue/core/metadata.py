@@ -1,5 +1,6 @@
 import bpy, json
 from dataclasses import dataclass, asdict, field
+from typing import Any
 
 # This creates metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
 # https://github.com/ucupumar/ucupaint
@@ -185,17 +186,44 @@ class MetadataEncoder(json.JSONEncoder):
 def get_mesh_objs() -> list[bpy.types.Object]:
     return [obj for obj in bpy.data.collections['Export'].objects if obj.type == "MESH"]
 
+def get_empty_metadata() -> dict[str, Any]:
+    return {
+        "materials" : {}
+    }
+
 def assign_custom_metadata():
+    obj_dict = {}
+    empty_dict = {}
+    
     for obj in get_mesh_objs():
-        metadata = {
-            "materials" : {}
-        }
+        metadata = get_empty_metadata()
         
         for i in range(len(obj.material_slots)):
             material = obj.material_slots[i].material
             metadata["materials"][unreal_material_name(material.name)] = MaterialMetadata.create_material_metadata(material)
-            
+        
+        obj_dict[obj] = metadata
+        
+        # Handle possible combine meshes option
+        # Send2ue uses immediate parent empties to group meshes into separate files, if combine meshes is enabled.
+        # However, unreal's "combine mesh" import option keeps only one mesh's metadata.
+        # Therefore, we need to combine all children's metadata and set it on each child.
+        # Results in redundancies, but only way to get around this.
+        
+        if obj.parent and obj.parent.type == "EMPTY":
+            parent = obj.parent
+            if parent not in empty_dict:
+                empty_dict[parent] = get_empty_metadata()
+            for key, value in empty_dict[parent].items():
+                if isinstance(value, dict):
+                    empty_dict[parent][key] = empty_dict[parent][key] | metadata[key]
+                    
+    for obj, data in obj_dict.items():
+        metadata = data
+        if obj.parent and obj.parent.type == "EMPTY" and obj.parent in empty_dict:
+            metadata = empty_dict[obj.parent]
         obj[METADATA_NAME] = json.dumps(metadata, cls = MetadataEncoder)
+
 
 def delete_custom_metadata():
     for obj in get_mesh_objs():
