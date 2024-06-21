@@ -11,9 +11,9 @@ from dataclasses import dataclass, asdict, field
 
 # Only Principled BSDF materials are supported for non-Ucupaint values on the main shader node.
 
-metadata_name = "unreal_metadata"
-input_prefix = "Param_"
-node_wrangler_textures = [
+METADATA_NAME = "unreal_metadata"
+INPUT_PREFIX = "Param_"
+NODE_WRANGLER_TEXTURES = [
     "Base Color",
     "Metallic",
     "Specular",
@@ -114,11 +114,11 @@ class MaterialMetadata():
             
             # Handle node wrangler / flagged texture nodes
             elif node.type == "TEX_IMAGE":
-                if node.label in node_wrangler_textures or node.label.find(input_prefix) == 0:
-                    if node.label in node_wrangler_textures:
+                if node.label in NODE_WRANGLER_TEXTURES or node.label.find(INPUT_PREFIX) == 0:
+                    if node.label in NODE_WRANGLER_TEXTURES:
                         label = node.label
                     else:
-                        label = node.label[len(input_prefix):]
+                        label = node.label[len(INPUT_PREFIX):]
                     image_name = unreal_name(node.image.name)
                     if len(node.outputs[0].links) > 0:
                         socket_type = node.outputs[0].links[0].to_socket.type
@@ -132,12 +132,12 @@ class MaterialMetadata():
                         print(f"Image {image_node.label} not connected to an output, skipping.\n")
             
             # Handle flagged color/value constants
-            elif node.type == "RGB" and node.label.find(input_prefix) == 0:
-                vector_input = MaterialMetadata.get_vector(vector_inputs, node.label[len(input_prefix):]) 
+            elif node.type == "RGB" and node.label.find(INPUT_PREFIX) == 0:
+                vector_input = MaterialMetadata.get_vector(vector_inputs, node.label[len(INPUT_PREFIX):]) 
                 vector_input.default = list(node.outputs[0].default_value)
             
-            elif node.type == "VALUE" and node.label.find(input_prefix) == 0:
-                scalar_input = MaterialMetadata.get_scalar(scalar_inputs, node.label[len(input_prefix):]) 
+            elif node.type == "VALUE" and node.label.find(INPUT_PREFIX) == 0:
+                scalar_input = MaterialMetadata.get_scalar(scalar_inputs, node.label[len(INPUT_PREFIX):]) 
                 scalar_input.default = node.outputs[0].default_value
                 
             elif node.type == "BSDF_PRINCIPLED": # TODO: Just read every input node? Too crowded?
@@ -185,8 +185,8 @@ def assign_custom_metadata():
             material = obj.material_slots[i].material
             metadata["materials"].append(MaterialMetadata.create_material_metadata(material))
             
-        obj[metadata_name] = json.dumps(metadata, cls = MetadataEncoder)
+        obj[METADATA_NAME] = json.dumps(metadata, cls = MetadataEncoder)
 
 def delete_custom_metadata():
     for obj in get_mesh_objs():
-        del obj[metadata_name]
+        del obj[METADATA_NAME]
