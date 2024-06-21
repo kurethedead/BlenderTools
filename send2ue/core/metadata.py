@@ -32,11 +32,11 @@ def unreal_name(name : str) -> str:
     return name.replace(" ", "_").rsplit(".", 1)[0] # remove file extension
 
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
-    imageDict = {}
+    image_dict = {}
     for node in node_tree.nodes:
         if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked ":
-            imageDict[node.label[len("Baked "):]] = node
-    return imageDict
+            image_dict[node.label[len("Baked "):]] = node
+    return image_dict
 
 def default_vector():
     return [0,0,0,0]
@@ -55,32 +55,32 @@ class VectorInputMetadata():
 class MaterialMetadata():
     name : str
     
-    scalarInputs : dict[str, ScalarInputMetadata]
-    vectorInputs : dict[str, VectorInputMetadata]
+    scalar_inputs : dict[str, ScalarInputMetadata]
+    vector_inputs : dict[str, VectorInputMetadata]
     
     @staticmethod
-    def get_scalar(scalarInputs : dict[str, ScalarInputMetadata], label : str) -> ScalarInputMetadata:
-        if label in scalarInputs:
-            return scalarInputs[label]
+    def get_scalar(scalar_inputs : dict[str, ScalarInputMetadata], label : str) -> ScalarInputMetadata:
+        if label in scalar_inputs:
+            return scalar_inputs[label]
         else:
-            scalarInput = ScalarInputMetadata()
-            scalarInputs[label] = scalarInput
-            return scalarInput
+            scalar_input = ScalarInputMetadata()
+            scalar_inputs[label] = scalar_input
+            return scalar_input
     
     @staticmethod
-    def get_vector(vectorInputs : dict[str, VectorInputMetadata], label : str) -> VectorInputMetadata:
-        if label in vectorInputs:
-            return vectorInputs[label]
+    def get_vector(vector_inputs : dict[str, VectorInputMetadata], label : str) -> VectorInputMetadata:
+        if label in vector_inputs:
+            return vector_inputs[label]
         else:
-            vectorInput = VectorInputMetadata()
-            vectorInputs[label] = vectorInput
-            return vectorInput
+            vector_input = VectorInputMetadata()
+            vector_inputs[label] = vector_input
+            return vector_input
     
     @staticmethod
     def create_material_metadata(material : bpy.types.Material) -> 'MaterialMetadata':
         name = material.name
-        scalarInputs : dict[str, ScalarInputMetadata] = {}
-        vectorInputs : dict[str, VectorInputMetadata] = {}
+        scalar_inputs : dict[str, ScalarInputMetadata] = {}
+        vector_inputs : dict[str, VectorInputMetadata] = {}
         
         for node in material.node_tree.nodes:
             # Find Ucupaint group
@@ -91,9 +91,9 @@ class MaterialMetadata():
                     input = node.inputs[i]
                     input_name = input.name if input.name != "Color" else "Base Color" # Make consistent with Principled BSDF
                     if input.type == "RGBA" or input.type == "VECTOR":
-                        MaterialMetadata.get_vector(vectorInputs, input_name).default = list(input.default_value)
+                        MaterialMetadata.get_vector(vector_inputs, input_name).default = list(input.default_value)
                     elif input.type == "VALUE":
-                        MaterialMetadata.get_scalar(scalarInputs, input_name).default = input.default_value
+                        MaterialMetadata.get_scalar(scalar_inputs, input_name).default = input.default_value
                     else:
                         print(f"Skipping input: {input_name}\n")
                 
@@ -104,9 +104,9 @@ class MaterialMetadata():
                             socket_type = image_node.outputs[0].links[0].to_socket.type
                             image_name = unreal_name(image_node.image.name[len("Ucupaint "):])
                             if socket_type == "RGBA" or socket_type == "VECTOR":
-                                MaterialMetadata.get_vector(vectorInputs, channel).texture_name = image_name
+                                MaterialMetadata.get_vector(vector_inputs, channel).texture_name = image_name
                             elif socket_type == "VALUE":
-                                MaterialMetadata.get_scalar(scalarInputs, channel).texture_name = image_name
+                                MaterialMetadata.get_scalar(scalar_inputs, channel).texture_name = image_name
                             else:
                                print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
                         else:
@@ -123,9 +123,9 @@ class MaterialMetadata():
                     if len(node.outputs[0].links) > 0:
                         socket_type = node.outputs[0].links[0].to_socket.type
                         if socket_type == "RGBA" or socket_type == "VECTOR":
-                            MaterialMetadata.get_vector(vectorInputs, label).texture_name = image_name
+                            MaterialMetadata.get_vector(vector_inputs, label).texture_name = image_name
                         elif socket_type == "VALUE":
-                            MaterialMetadata.get_scalar(scalarInputs, label).texture_name = image_name
+                            MaterialMetadata.get_scalar(scalar_inputs, label).texture_name = image_name
                         else:
                            print(f"Skipping image due to invalid output connection: {image_node.label}\n")
                     else:
@@ -133,32 +133,32 @@ class MaterialMetadata():
             
             # Handle flagged color/value constants
             elif node.type == "RGB" and node.label.find(input_prefix) == 0:
-                vectorInput = MaterialMetadata.get_vector(vectorInputs, node.label[len(input_prefix):]) 
-                vectorInput.default = list(node.outputs[0].default_value)
+                vector_input = MaterialMetadata.get_vector(vector_inputs, node.label[len(input_prefix):]) 
+                vector_input.default = list(node.outputs[0].default_value)
             
             elif node.type == "VALUE" and node.label.find(input_prefix) == 0:
-                scalarInput = MaterialMetadata.get_scalar(scalarInputs, node.label[len(input_prefix):]) 
-                scalarInput.default = node.outputs[0].default_value
+                scalar_input = MaterialMetadata.get_scalar(scalar_inputs, node.label[len(input_prefix):]) 
+                scalar_input.default = node.outputs[0].default_value
                 
-            elif node.type == "BSDF_PRINCIPLED":
+            elif node.type == "BSDF_PRINCIPLED": # TODO: Just read every input node? Too crowded?
                 if len(node.inputs["Base Color"].links) == 0:
-                    MaterialMetadata.get_vector(vectorInputs, "Base Color").default = list(node.inputs["Base Color"].default_value)
+                    MaterialMetadata.get_vector(vector_inputs, "Base Color").default = list(node.inputs["Base Color"].default_value)
                 if len(node.inputs["Metallic"].links) == 0:
-                    MaterialMetadata.get_scalar(scalarInputs, "Metallic").default = node.inputs["Metallic"].default_value
+                    MaterialMetadata.get_scalar(scalar_inputs, "Metallic").default = node.inputs["Metallic"].default_value
                 if len(node.inputs["Roughness"].links) == 0:
-                    MaterialMetadata.get_scalar(scalarInputs, "Roughness").default = node.inputs["Roughness"].default_value
+                    MaterialMetadata.get_scalar(scalar_inputs, "Roughness").default = node.inputs["Roughness"].default_value
                 if len(node.inputs["Alpha"].links) == 0:
-                    MaterialMetadata.get_scalar(scalarInputs, "Alpha").default = node.inputs["Alpha"].default_value
+                    MaterialMetadata.get_scalar(scalar_inputs, "Alpha").default = node.inputs["Alpha"].default_value
                 if len(node.inputs["Normal"].links) == 0:
-                    MaterialMetadata.get_vector(vectorInputs, "Normal").default = default_vector()
+                    MaterialMetadata.get_vector(vector_inputs, "Normal").default = default_vector()
                 if len(node.inputs["Specular IOR Level"].links) == 0:
-                    MaterialMetadata.get_scalar(scalarInputs, "Specular").default = node.inputs["Specular IOR Level"].default_value
+                    MaterialMetadata.get_scalar(scalar_inputs, "Specular").default = node.inputs["Specular IOR Level"].default_value
                 if len(node.inputs["Emission Color"].links) == 0:
-                    MaterialMetadata.get_vector(vectorInputs, "Emission").default = list(node.inputs["Emission Color"].default_value)
+                    MaterialMetadata.get_vector(vector_inputs, "Emission").default = list(node.inputs["Emission Color"].default_value)
                 if len(node.inputs["Emission Strength"].links) == 0:
-                    MaterialMetadata.get_scalar(scalarInputs, "Emission Strength").default = node.inputs["Emission Strength"].default_value
+                    MaterialMetadata.get_scalar(scalar_inputs, "Emission Strength").default = node.inputs["Emission Strength"].default_value
         
-        return MaterialMetadata(name, scalarInputs, vectorInputs)
+        return MaterialMetadata(name, scalar_inputs, vector_inputs)
     
 dataclasses = [
     MaterialMetadata,
