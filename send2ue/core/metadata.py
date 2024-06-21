@@ -2,15 +2,15 @@ import bpy, json
 from dataclasses import dataclass, asdict, field
 from typing import Any
 
-# This creates metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
+# This creates material metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
 # https://github.com/ucupumar/ucupaint
 
-# This will find any Ucupaint group nodes and read default inputs from it.
-# It will then look inside the group and read any textures from it.
-# It will then look at any top level image texture nodes / value nodes and read them if they start with "Param_"
-# or if they are one of the node wrangler names ["Base Color", "Roughness", "Metallic", "Normal", "Alpha"]
-
-# Only Principled BSDF materials are supported for non-Ucupaint values on the main shader node.
+# This will store the values (for color/value nodes) and texture names (for texture nodes) for:
+# 1. Ucupaint group input socket default values
+# 2. Baked images inside an Ucupaint group, if the node tree is using baked images
+# 3. Top level texture nodes using node wrangler labels
+# 4. Any other applicable node whose label starts with the specified input prefix
+# 5. Most unconnected input sockets on the Principled BSDF node (other shader nodes not supported)
 
 METADATA_NAME = "blender_metadata"
 INPUT_PREFIX = "Param_"
