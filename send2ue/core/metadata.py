@@ -58,6 +58,13 @@ def unreal_material_name(name : str) -> str:
         name = name.replace(c, "_")
     return name
 
+def fix_material_name(material : bpy.types.Material):
+    material.name = unreal_material_name(material.name)
+    
+    # handle duplicate naming suffixes (ex. .001)
+    while "." in material.name:
+        material.name = unreal_material_name(material.name)
+
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
     image_dict = {}
     for node in node_tree.nodes:
@@ -214,7 +221,8 @@ def assign_custom_metadata():
         
         for i in range(len(obj.material_slots)):
             material = obj.material_slots[i].material
-            metadata["materials"][unreal_material_name(material.name)] = MaterialMetadata.create_material_metadata(material)
+            fix_material_name(material)
+            metadata["materials"][material.name] = MaterialMetadata.create_material_metadata(material)
         
         obj_dict[obj] = metadata
         
