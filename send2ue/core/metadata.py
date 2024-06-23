@@ -31,8 +31,24 @@ NODE_WRANGLER_TEXTURES = [
 
 INVALID_FILENAME_CHARS = "!@#$%^&*()=[]\\:;\"\'<,>./? "
 
+# Blender image format enum to file extension
+IMAGE_EXTENSIONS = {
+    "BMP" : "bmp", 
+    "PNG" : "png",
+    "JPEG" : "jpg",
+    "JPEG2000" : "jp2",
+    "TARGA" : "tga",
+    "OPEN_EXR" : "exr",
+    "HDR" : "hdr",
+    "TIFF" : "tiff",
+    "WEBP" : "webp"
+}
+
 def unreal_image_name(name : str) -> str:
-    name = name.rsplit(".", 1)[0] # remove file extension
+    # remove file extension
+    for ext in list(IMAGE_EXTENSIONS.values()):
+        if name.endswith(f".{ext}"):
+            name = name[:-(len(ext) + 1)]
     for c in INVALID_FILENAME_CHARS:
         name = name.replace(c, "_")
     return name
@@ -64,8 +80,6 @@ class VectorInputMetadata():
     
 @dataclass
 class MaterialMetadata():
-    name : str
-    
     scalar_inputs : dict[str, ScalarInputMetadata]
     vector_inputs : dict[str, VectorInputMetadata]
     
@@ -89,7 +103,6 @@ class MaterialMetadata():
     
     @staticmethod
     def create_material_metadata(material : bpy.types.Material) -> 'MaterialMetadata':
-        name = material.name
         scalar_inputs : dict[str, ScalarInputMetadata] = {}
         vector_inputs : dict[str, VectorInputMetadata] = {}
         
@@ -111,13 +124,14 @@ class MaterialMetadata():
                 if node.node_tree.yp.use_baked:
                     # Handle Ucupaint baked images
                     for channel, image_node in get_baked_images(node.node_tree).items():
+                        channel_name = channel if channel != "Color" else "Base Color" # Make consistent with Principled BSDF
                         if len(image_node.outputs[0].links) > 0:
                             socket_type = image_node.outputs[0].links[0].to_socket.type
                             image_name = unreal_image_name(image_node.image.name[len("Ucupaint "):])
                             if socket_type == "RGBA" or socket_type == "VECTOR":
-                                MaterialMetadata.get_vector(vector_inputs, channel).texture_name = image_name
+                                MaterialMetadata.get_vector(vector_inputs, channel_name).texture_name = image_name
                             elif socket_type == "VALUE":
-                                MaterialMetadata.get_scalar(scalar_inputs, channel).texture_name = image_name
+                                MaterialMetadata.get_scalar(scalar_inputs, channel_name).texture_name = image_name
                             else:
                                print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
                         else:
@@ -169,7 +183,7 @@ class MaterialMetadata():
                 if len(node.inputs["Emission Strength"].links) == 0:
                     MaterialMetadata.get_scalar(scalar_inputs, "Emission Strength").default = node.inputs["Emission Strength"].default_value
         
-        return MaterialMetadata(name, scalar_inputs, vector_inputs)
+        return MaterialMetadata(scalar_inputs, vector_inputs)
     
 DATACLASSES = [
     MaterialMetadata,
