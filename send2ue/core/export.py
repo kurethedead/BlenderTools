@@ -565,6 +565,8 @@ def create_texture_data(mesh_objects, properties):
 
                             # Save baked images
                             for channel, image in image_dict.items():
+                                if channel in UCUPAINT_IGNORE_BAKED:
+                                    continue
                                 image_name = image.name
                                 if image_name.startswith(f"{UCUPAINT_TITLE} "):
                                     image_name = image_name[len(f"{UCUPAINT_TITLE} "):]

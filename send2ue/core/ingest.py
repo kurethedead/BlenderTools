@@ -34,10 +34,10 @@ def import_asset(asset_id, property_data):
             
             # Remove duplicate image saving
             for other_id, other_data in bpy.context.window_manager.send2ue.asset_data.items():
-                if "image_file_paths" in other_data:
+                if "images_file_paths" in other_data:
                     for image_path in asset_data.get('images_file_paths'):
-                        if image_path in other_data["image_file_paths"]:
-                            other_data["image_file_paths"].remove(image_path)
+                        if image_path in other_data["images_file_paths"]:
+                            other_data["images_file_paths"].remove(image_path)
             
         UnrealRemoteCalls.import_asset(file_path, asset_data, property_data)
 

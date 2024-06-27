@@ -15,6 +15,11 @@ NODE_WRANGLER_TEXTURES = [
     "Ambient Occlusion",
 ]
 
+UCUPAINT_IGNORE_BAKED = [
+    "Normal Overlay Only",
+    "Normal Displacement"
+]
+
 INVALID_FILENAME_CHARS = "!@#$%^&*()=[]\\:;\"\'<,>./? "
 
 # Blender image format enum to file extension
