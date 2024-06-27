@@ -517,7 +517,7 @@ def get_image_ext(ext_enum : str) -> str:
     else:
         return ext_enum
 
-def create_texture_data(mesh_objects, properties):
+def create_texture_data(mesh_objects, mesh_asset_data, properties):
     """
     Collects and creates all the asset data needed for the import process.
     This uses a specialized setup that handles Ucupaint baked images, node wrangler nodes, and explicitly prefixed nodes.
@@ -531,8 +531,7 @@ def create_texture_data(mesh_objects, properties):
         return texture_data
 
     previous_asset_names = []
-    materials = []
-    images_file_paths = []
+    all_images_file_paths = []
 
     # get the asset data for the scene objects
     for mesh_object in mesh_objects:
@@ -540,7 +539,15 @@ def create_texture_data(mesh_objects, properties):
         directory = utilities.get_export_folder_path(properties, asset_type)
         already_exported = False
         asset_name = utilities.get_asset_name(mesh_object.name, properties)
-
+        # get mesh file path - used so asset_id corresponds to mesh
+        file_path = get_file_path(mesh_object.name, properties, asset_type, lod=False)
+        # export the object
+        asset_id = utilities.get_asset_id(file_path)
+        import_path = utilities.get_import_path(properties, asset_type)
+        
+        materials = []
+        images_file_paths = []
+        
         # only export meshes that are lod 0
         if properties.import_lods and utilities.get_lod_index(mesh_object.name, properties) != 0:
             continue
@@ -553,55 +560,60 @@ def create_texture_data(mesh_objects, properties):
                 break
 
         if not already_exported:
-            for i in range(len(mesh_object.material_slots)):
-                material = mesh_object.material_slots[i].material
-                if material not in materials:
-                    materials.append(material)
-                    for node in material.node_tree.nodes:
-                        
-                        # Handle Ucupaint group nodes
-                        if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:          
-                            image_dict = get_baked_images(node.node_tree)
+            # When combine meshes is enabled, only one mesh per parent empty is processed,
+            # and the rest are filtered out before we get to this point.
+            # Therefore we always gather textures as if combine mesh is enabled,
+            # then in ingest.import_asset() we filter out repeat textures to avoid multiple imports.
+            objects_to_process = [mesh_object]
+            if mesh_object.parent and mesh_object.parent.type == "EMPTY":
+                objects_to_process = [obj for obj in mesh_object.parent.children_recursive if obj.type == "MESH"]
 
-                            # Save baked images
-                            for channel, image in image_dict.items():
-                                if channel in UCUPAINT_IGNORE_BAKED:
-                                    continue
-                                image_name = image.name
-                                if image_name.startswith(f"{UCUPAINT_TITLE} "):
-                                    image_name = image_name[len(f"{UCUPAINT_TITLE} "):]
-                                fmt = get_image_ext(image.file_format)
-                                # Remove image extension beforehand, since we dont know if name contains extension or not
-                                filepath = f"{directory}\\{remove_image_ext(image_name)}.{fmt}"
-                                image.save(filepath = filepath)
-                                images_file_paths.append(filepath)
-                         
-                        # Handle node wrangler or prefixed image nodes               
-                        if node.type == "TEX_IMAGE":
-                            if node.image and node.label in NODE_WRANGLER_TEXTURES or node.label.find(INPUT_PREFIX) == 0:
-                                #channel = node.label if node.label in NODE_WRANGLER_TEXTURES else node.label[len(INPUT_PREFIX):]
-                                fmt = get_image_ext(node.image.file_format)
-                                # Remove image extension beforehand, since we dont know if name contains extension or not
-                                filepath = f"{directory}\\{remove_image_ext(node.image.name)}.{fmt}"
-                                node.image.save(filepath = filepath)
-                                #node.image.save(filepath = f"{directory}\\{material.name}_{channel}.{fmt}")
-                                images_file_paths.append(filepath)
-                
-            # get mesh file path - used so asset_id corresponds to mesh
-            file_path = get_file_path(mesh_object.name, properties, asset_type, lod=False)
-            # export the object
-            asset_id = utilities.get_asset_id(file_path)
-            import_path = utilities.get_import_path(properties, asset_type)
+            for obj in objects_to_process:
+                for i in range(len(obj.material_slots)):
+                    material = obj.material_slots[i].material
+                    if material not in materials:
+                        materials.append(material)
+                        for node in material.node_tree.nodes:
+
+                            # Handle Ucupaint group nodes
+                            if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:          
+                                image_dict = get_baked_images(node.node_tree)
+
+                                # Save baked images
+                                for channel, image in image_dict.items():
+                                    if channel in UCUPAINT_IGNORE_BAKED:
+                                        continue
+                                    image_name = image.name
+                                    if image_name.startswith(f"{UCUPAINT_TITLE} "):
+                                        image_name = image_name[len(f"{UCUPAINT_TITLE} "):]
+                                    fmt = get_image_ext(image.file_format)
+                                    # Remove image extension beforehand, since we dont know if name contains extension or not
+                                    filepath = f"{directory}\\{remove_image_ext(image_name)}.{fmt}"
+                                    if filepath not in all_images_file_paths:
+                                        image.save(filepath = filepath)
+                                        all_images_file_paths.append(filepath)
+                                    images_file_paths.append(filepath)
+
+                            # Handle node wrangler or prefixed image nodes               
+                            if node.type == "TEX_IMAGE":
+                                if node.image and node.label in NODE_WRANGLER_TEXTURES or node.label.find(INPUT_PREFIX) == 0:
+                                    #channel = node.label if node.label in NODE_WRANGLER_TEXTURES else node.label[len(INPUT_PREFIX):]
+                                    fmt = get_image_ext(node.image.file_format)
+                                    # Remove image extension beforehand, since we dont know if name contains extension or not
+                                    filepath = f"{directory}\\{remove_image_ext(node.image.name)}.{fmt}"
+                                    if filepath not in all_images_file_paths:
+                                        node.image.save(filepath = filepath)
+                                        all_images_file_paths.append(filepath)
+                                    #node.image.save(filepath = f"{directory}\\{material.name}_{channel}.{fmt}")
+                                    images_file_paths.append(filepath)
 
             # save the asset data
-            texture_data[asset_id] = {
+            mesh_asset_data[asset_id] = mesh_asset_data[asset_id] | {
                 'images_file_paths': images_file_paths,
                 'image_asset_folder': import_path,
                 'skip': False
             }
             previous_asset_names.append(asset_name)
-
-    return texture_data
 
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Image]:
     image_dict = {}
@@ -648,10 +660,7 @@ def create_asset_data(properties):
     hair_data = create_groom_data(hair_objects, properties)
     
     # get all textures, merge asset data into mesh asset data
-    texture_data = create_texture_data(mesh_objects, properties)
-    for asset_id, _ in texture_data.items():
-        if asset_id in mesh_data:
-            mesh_data[asset_id] = {**mesh_data[asset_id], **texture_data[asset_id]} 
+    create_texture_data(mesh_objects, mesh_data, properties)
 
     # update the properties with the asset data
     bpy.context.window_manager.send2ue.asset_data.update({**mesh_data, **animation_data, **hair_data})
