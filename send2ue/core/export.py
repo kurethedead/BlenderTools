@@ -8,6 +8,7 @@ from . import utilities, validations, settings, ingest, extension, io
 from ..constants import BlenderTypes, UnrealTypes, FileTypes, PreFixToken, ToolInfo, ExtensionTasks
 from . import metadata
 
+from .texture_constants import *
 
 def get_file_path(asset_name, properties, asset_type, lod=False, file_extension='fbx'):
     """
@@ -504,6 +505,118 @@ def create_groom_data(hair_objects, properties):
 
     return groom_data
 
+def remove_image_ext(name : str) -> str:
+    for ext in list(IMAGE_EXTENSIONS.values()):
+        if name.endswith(f".{ext}"):
+            return name[:-(len(ext) + 1)]
+    return name
+
+def get_image_ext(ext_enum : str) -> str:
+    if ext_enum in IMAGE_EXTENSIONS:
+        return IMAGE_EXTENSIONS[ext_enum]
+    else:
+        return ext_enum
+
+def create_texture_data(mesh_objects, properties):
+    """
+    Collects and creates all the asset data needed for the import process.
+    This uses a specialized setup that handles Ucupaint baked images, node wrangler nodes, and explicitly prefixed nodes.
+
+    :param list mesh_objects: A list of mesh objects.
+    :param object properties: The property group that contains variables that maintain the addon's correct state.
+    :return list: A list of dictionaries containing the texture import data.
+    """
+    texture_data = {}
+    if not properties.import_materials_and_textures:
+        return texture_data
+
+    previous_asset_names = []
+    materials = []
+    images_file_paths = []
+
+    # get the asset data for the scene objects
+    for mesh_object in mesh_objects:
+        asset_type = utilities.get_mesh_unreal_type(mesh_object)
+        directory = utilities.get_export_folder_path(properties, asset_type)
+        already_exported = False
+        asset_name = utilities.get_asset_name(mesh_object.name, properties)
+
+        # only export meshes that are lod 0
+        if properties.import_lods and utilities.get_lod_index(mesh_object.name, properties) != 0:
+            continue
+
+        # TODO: don't think this block is needed, how would the code ever reach this block since all LODs except LOD0 are skipped?
+        # check each previous asset name for its lod mesh
+        for previous_asset in previous_asset_names:
+            if utilities.is_lod_of(previous_asset, mesh_object.name, properties):
+                already_exported = True
+                break
+
+        if not already_exported:
+            for i in range(len(mesh_object.material_slots)):
+                material = mesh_object.material_slots[i].material
+                if material not in materials:
+                    materials.append(material)
+                    for node in material.node_tree.nodes:
+                        
+                        # Handle Ucupaint group nodes
+                        if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:          
+                            image_dict = get_baked_images(node.node_tree)
+
+                            # Save baked images
+                            for channel, image in image_dict.items():
+                                image_name = image.name
+                                if image_name.startswith(f"{UCUPAINT_TITLE} "):
+                                    image_name = image_name[len(f"{UCUPAINT_TITLE} "):]
+                                fmt = get_image_ext(image.file_format)
+                                # Remove image extension beforehand, since we dont know if name contains extension or not
+                                filepath = f"{directory}\\{remove_image_ext(image_name)}.{fmt}"
+                                image.save(filepath = filepath)
+                                images_file_paths.append(filepath)
+                         
+                        # Handle node wrangler or prefixed image nodes               
+                        if node.type == "TEX_IMAGE":
+                            if node.image and node.label in NODE_WRANGLER_TEXTURES or node.label.find(INPUT_PREFIX) == 0:
+                                #channel = node.label if node.label in NODE_WRANGLER_TEXTURES else node.label[len(INPUT_PREFIX):]
+                                fmt = get_image_ext(node.image.file_format)
+                                # Remove image extension beforehand, since we dont know if name contains extension or not
+                                filepath = f"{directory}\\{remove_image_ext(node.image.name)}.{fmt}"
+                                node.image.save(filepath = filepath)
+                                #node.image.save(filepath = f"{directory}\\{material.name}_{channel}.{fmt}")
+                                images_file_paths.append(filepath)
+                
+            # get mesh file path - used so asset_id corresponds to mesh
+            file_path = get_file_path(mesh_object.name, properties, asset_type, lod=False)
+            # export the object
+            asset_id = utilities.get_asset_id(file_path)
+            import_path = utilities.get_import_path(properties, asset_type)
+
+            # save the asset data
+            texture_data[asset_id] = {
+                'images_file_paths': images_file_paths,
+                'image_asset_folder': import_path,
+                'skip': False
+            }
+            previous_asset_names.append(asset_name)
+
+    return texture_data
+
+def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Image]:
+    image_dict = {}
+    for node in node_tree.nodes:
+        if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked " and node.image:
+            image_dict[node.label[len("Baked "):]] = node.image
+    return image_dict
+    
+def get_other_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Image]:
+    image_dict = {}
+    for node in node_tree.nodes:
+        if node.type == "TEX_IMAGE" and node.image:
+            if node.label in NODE_WRANGLER_TEXTURES:
+                image_dict[node.label] = node.image
+            elif node.label.find(INPUT_PREFIX) == 0:
+                image_dict[node.label[len(INPUT_PREFIX):]] = node.image
+    return image_dict
 
 def create_asset_data(properties):
     """
@@ -531,6 +644,12 @@ def create_asset_data(properties):
 
     # get the asset data for all the hair systems
     hair_data = create_groom_data(hair_objects, properties)
+    
+    # get all textures, merge asset data into mesh asset data
+    texture_data = create_texture_data(mesh_objects, properties)
+    for asset_id, _ in texture_data.items():
+        if asset_id in mesh_data:
+            mesh_data[asset_id] = {**mesh_data[asset_id], **texture_data[asset_id]} 
 
     # update the properties with the asset data
     bpy.context.window_manager.send2ue.asset_data.update({**mesh_data, **animation_data, **hair_data})

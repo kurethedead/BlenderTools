@@ -1,6 +1,7 @@
 import bpy, json
 from dataclasses import dataclass, asdict, field
 from typing import Any
+from .texture_constants import *
 
 # This creates material metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
 # https://github.com/ucupumar/ucupaint
@@ -13,36 +14,6 @@ from typing import Any
 # 5. Most unconnected input sockets on the Principled BSDF node (other shader nodes not supported)
 
 METADATA_NAME = "blender_metadata"
-INPUT_PREFIX = "Param_"
-NODE_WRANGLER_TEXTURES = [
-    "Base Color",
-    "Metallic",
-    "Specular",
-    "Roughness",
-    "Gloss",
-    "Normal",
-    "Bump",
-    "Displacement",
-    "Transmission",
-    "Emission",
-    "Alpha",
-    "Ambient Occlusion",
-]
-
-INVALID_FILENAME_CHARS = "!@#$%^&*()=[]\\:;\"\'<,>./? "
-
-# Blender image format enum to file extension
-IMAGE_EXTENSIONS = {
-    "BMP" : "bmp", 
-    "PNG" : "png",
-    "JPEG" : "jpg",
-    "JPEG2000" : "jp2",
-    "TARGA" : "tga",
-    "OPEN_EXR" : "exr",
-    "HDR" : "hdr",
-    "TIFF" : "tiff",
-    "WEBP" : "webp"
-}
 
 def unreal_image_name(name : str) -> str:
     # remove file extension

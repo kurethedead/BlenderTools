@@ -707,6 +707,40 @@ class Unreal:
                 actor_subsystem.destroy_actor(actor)
                 break
 
+class UnrealImportImages(Unreal):
+    def __init__(self, image_filepaths, asset_data, property_data):
+        """
+        Initializes the import with asset data and property data.
+
+        :param str file_path: The full path to the file to import.
+        :param dict asset_data: A dictionary that contains various data about the asset.
+        :param PropertyData property_data: A property data instance that contains all property values of the tool.
+        """
+        self._image_filepaths = image_filepaths
+        self._asset_data = asset_data
+        self._property_data = property_data
+        self._image_import_tasks = []
+        
+    def set_texture_import_options(self):
+        self._image_import_tasks = []
+        
+        # We only want to import textures during mesh import process
+        if self._property_data.get('import_materials_and_textures', {}).get('value', False) and \
+            self._asset_data.get('_asset_type') in ['StaticMesh', 'SkeletalMesh']:
+            for i in range(len(self._image_filepaths)):
+                image_task = unreal.AssetImportTask()
+                image_task.set_editor_property('filename', self._image_filepaths[i])
+                image_task.set_editor_property('destination_path', self._asset_data.get('image_asset_folder'))
+                image_task.set_editor_property('replace_existing', True)
+                image_task.set_editor_property('replace_existing_settings', True)
+                image_task.set_editor_property('automated', True)
+                
+                self._image_import_tasks.append(image_task)
+                
+    def run_import(self):
+        if len(self._image_import_tasks) > 0:
+            unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(self._image_import_tasks)
+
 
 class UnrealImportAsset(Unreal):
     def __init__(self, file_path, asset_data, property_data):
@@ -1265,6 +1299,21 @@ class UnrealRemoteCalls:
 
             # run the import task
             return unreal_import_asset.run_import()
+    
+    @staticmethod
+    def import_images(images_file_paths, asset_data, property_data):
+        """
+        Imports an asset to unreal based on the asset data in the provided dictionary.
+
+        :param str file_path: The full path to the file to import.
+        :param dict asset_data: A dictionary of import parameters.
+        :param dict property_data: A dictionary representation of the properties.
+        """
+ 
+        unreal_import_images = UnrealImportImages(images_file_paths, asset_data, property_data)
+        unreal_import_images.set_texture_import_options()
+        
+        unreal_import_images.run_import()
 
     @staticmethod
     def create_asset(asset_path, asset_class=None, asset_factory=None, unique_name=True):

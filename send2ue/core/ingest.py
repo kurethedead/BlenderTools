@@ -23,6 +23,22 @@ def import_asset(asset_id, property_data):
 
     if not asset_data.get('skip'):
         file_path = asset_data.get('file_path')
+        
+        # Import textures before mesh
+        if asset_data.get('images_file_paths'):
+            UnrealRemoteCalls.import_images(
+                asset_data.get('images_file_paths'),
+                asset_data,
+                property_data
+            )
+            
+            # Remove duplicate image saving
+            for other_id, other_data in bpy.context.window_manager.send2ue.asset_data.items():
+                if "image_file_paths" in other_data:
+                    for image_path in asset_data.get('images_file_paths'):
+                        if image_path in other_data["image_file_paths"]:
+                            other_data["image_file_paths"].remove(image_path)
+            
         UnrealRemoteCalls.import_asset(file_path, asset_data, property_data)
 
         # import fcurves
