@@ -254,7 +254,7 @@ class AffixesExtension(ExtensionBase):
             "Whether or not to add the affixes (prefix, suffix) to the asset names before the export. "
             "Prefixes end with an underscore (e.g. Prefix_) and suffixes start with an underscore (e.g. _Suffix)"
         ),
-        default=False,
+        default=True,
     )
     auto_remove_asset_name_affixes: bpy.props.BoolProperty(
         name="Remove affixes after export",
@@ -262,7 +262,7 @@ class AffixesExtension(ExtensionBase):
             "Whether or not to remove the affixes (prefix, suffix) from the asset names after the export, "
             + "basically restoring the original names."
         ),
-        default=False,
+        default=True,
     )
     static_mesh_name_affix: bpy.props.StringProperty(
         name="Static Mesh Affix",

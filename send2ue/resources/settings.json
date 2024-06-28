@@ -1064,7 +1064,7 @@
             "name": "Custom Properties",
             "description": "Export custom properties",
             "type": "BOOLEAN",
-            "default": false
+            "default": true
           }
         },
         "transform": {

@@ -46,7 +46,7 @@
           "use_tspace": false
         },
         "include": {
-          "use_custom_props": false
+          "use_custom_props": true
         },
         "transform": {
           "apply_scale_options": "FBX_SCALE_NONE",
@@ -68,8 +68,8 @@
   "extensions": {
     "affixes": {
       "animation_sequence_name_affix": "Anim_",
-      "auto_add_asset_name_affixes": false,
-      "auto_remove_asset_name_affixes": false,
+      "auto_add_asset_name_affixes": true,
+      "auto_remove_asset_name_affixes": true,
       "material_name_affix": "M_",
       "show_name_affix_settings": false,
       "skeletal_mesh_name_affix": "SK_",
