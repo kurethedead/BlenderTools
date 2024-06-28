@@ -565,7 +565,7 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
             # Therefore we always gather textures as if combine mesh is enabled,
             # then in ingest.import_asset() we filter out repeat textures to avoid multiple imports.
             objects_to_process = [mesh_object]
-            if mesh_object.parent and mesh_object.parent.type == "EMPTY":
+            if mesh_object.parent and mesh_object.parent.type in ["EMPTY", "ARMATURE"]:
                 objects_to_process = [obj for obj in mesh_object.parent.children_recursive if obj.type == "MESH"]
 
             for obj in objects_to_process:

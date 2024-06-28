@@ -203,7 +203,6 @@ def assign_custom_metadata():
         # Therefore, we need to combine all children's metadata and set it on each child.
         # Results in redundancies, but only way to get around this.
         
-        # TODO: Is armature necessary here?
         if obj.parent and obj.parent.type in ["EMPTY", "ARMATURE"]:
             parent = obj.parent
             if parent not in empty_dict:
