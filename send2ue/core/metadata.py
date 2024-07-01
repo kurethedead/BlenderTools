@@ -214,7 +214,7 @@ def assign_custom_metadata():
                     
     for obj, data in obj_dict.items():
         metadata = data
-        parent = get_highest_ancestor()
+        parent = get_highest_ancestor(obj)
         if parent and parent.type in ["EMPTY", "ARMATURE"] and parent in empty_dict:
             metadata = empty_dict[parent]
         obj[METADATA_NAME] = json.dumps(metadata, cls = MetadataEncoder)
