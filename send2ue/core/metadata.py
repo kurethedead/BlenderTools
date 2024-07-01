@@ -130,9 +130,9 @@ class MaterialMetadata():
                         elif socket_type == "VALUE":
                             MaterialMetadata.get_scalar(scalar_inputs, label).texture_name = image_name
                         else:
-                           print(f"Skipping image due to invalid output connection: {image_node.label}\n")
+                           print(f"Skipping image due to invalid output connection: {node.label}\n")
                     else:
-                        print(f"Image {image_node.label} not connected to an output, skipping.\n")
+                        print(f"Image {node.label} not connected to an output, skipping.\n")
             
             # Handle flagged color/value constants
             elif node.type == "RGB" and node.label.find(INPUT_PREFIX) == 0:
@@ -203,8 +203,9 @@ def assign_custom_metadata():
         # Therefore, we need to combine all children's metadata and set it on each child.
         # Results in redundancies, but only way to get around this.
         
-        if obj.parent and obj.parent.type in ["EMPTY", "ARMATURE"]:
-            parent = obj.parent
+        parent = get_highest_ancestor(obj)
+        
+        if parent and parent.type in ["EMPTY", "ARMATURE"]:
             if parent not in empty_dict:
                 empty_dict[parent] = get_empty_metadata()
             for key, value in empty_dict[parent].items():
@@ -213,10 +214,16 @@ def assign_custom_metadata():
                     
     for obj, data in obj_dict.items():
         metadata = data
-        if obj.parent and obj.parent.type == "EMPTY" and obj.parent in empty_dict:
-            metadata = empty_dict[obj.parent]
+        parent = get_highest_ancestor()
+        if parent and parent.type in ["EMPTY", "ARMATURE"] and parent in empty_dict:
+            metadata = empty_dict[parent]
         obj[METADATA_NAME] = json.dumps(metadata, cls = MetadataEncoder)
 
+def get_highest_ancestor(obj : bpy.types.Object):
+    parent = obj.parent
+    while parent and parent.type not in ["EMPTY", "ARMATURE"]:
+        parent = parent.parent
+    return parent
 
 def delete_custom_metadata():
     for obj in get_mesh_objs():
