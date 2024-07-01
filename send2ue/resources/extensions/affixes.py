@@ -192,8 +192,8 @@ def rename_texture(image, new_name):
     # BUG: Currently this function seems to set image.filepath to a temp directory when it renames it.
     # This means that after a blend file is re-opened, all non-packed file references are gone.
     # Since this branch currently handles textures exporting separately,
-    # And since its technically okay if only one asset type doesn't have affixes when affixes are used,
-    # we just ignore renaming completely.
+    # And since the affix_operation is the thing that actually adds/removes affixes,
+    # we just ignore this completely.
     return
     
     if not new_name:
