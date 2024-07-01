@@ -188,6 +188,14 @@ def rename_texture(image, new_name):
     :param object image: A texture image referenced selected for export.
     :param str new_name: New name for the texture including the affix.
     """
+
+    # BUG: Currently this function seems to set image.filepath to a temp directory when it renames it.
+    # This means that after a blend file is re-opened, all non-packed file references are gone.
+    # Since this branch currently handles textures exporting separately,
+    # And since its technically okay if only one asset type doesn't have affixes when affixes are used,
+    # we just ignore renaming completely.
+    return
+    
     if not new_name:
         return
 
@@ -316,7 +324,7 @@ class AffixesExtension(ExtensionBase):
         dialog.draw_property(self, box, 'skeletal_mesh_name_affix')
         dialog.draw_property(self, box, 'animation_sequence_name_affix')
         dialog.draw_property(self, box, 'material_name_affix')
-        dialog.draw_property(self, box, 'texture_name_affix')
+        # dialog.draw_property(self, box, 'texture_name_affix') # unused - see rename_texture() for details
 
     def pre_operation(self, properties):
         """
