@@ -96,8 +96,11 @@ def append_affix(scene_object, affix, is_image=False):
     :param bool is_image: Indicates whether the object is an image.
     :return str: The new object name.
     """
-    filename, ext = os.path.splitext(scene_object.name)
-    asset_name = filename if is_image else scene_object.name
+    if is_image:
+        asset_name, ext = os.path.splitext(scene_object.name)
+    else:
+        asset_name = scene_object.name
+        ext = ""
 
     # Prefix
     if affix.endswith("_"):
@@ -122,8 +125,11 @@ def discard_affix(scene_object, affix, is_image=False):
     :param bool is_image: Indicates whether the object is an image.
     :return str: The new object name.
     """
-    filename, ext = os.path.splitext(scene_object.name)
-    asset_name = filename if is_image else scene_object.name
+    if is_image:
+        asset_name, ext = os.path.splitext(scene_object.name)
+    else:
+        asset_name = scene_object.name
+        ext = ""
 
     # Prefix
     if affix.endswith("_"):
