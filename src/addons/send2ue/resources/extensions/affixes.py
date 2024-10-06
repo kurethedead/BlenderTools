@@ -194,6 +194,10 @@ def rename_texture(image, new_name):
     # Since this branch currently handles textures exporting separately,
     # And since the affix_operation is the thing that actually adds/removes affixes,
     # we just ignore this completely.
+    
+    # Note - texture affixes now happen in export.py - create_texture_data(). 
+    # Since its not modifying texture names on disk and only modifying their export name, 
+    # we don't have to discard affix afterward.
     return
     
     if not new_name:
@@ -324,7 +328,7 @@ class AffixesExtension(ExtensionBase):
         dialog.draw_property(self, box, 'skeletal_mesh_name_affix')
         dialog.draw_property(self, box, 'animation_sequence_name_affix')
         dialog.draw_property(self, box, 'material_name_affix')
-        # dialog.draw_property(self, box, 'texture_name_affix') # unused - see rename_texture() for details
+        dialog.draw_property(self, box, 'texture_name_affix') # note: see rename_texture() for details on changes
 
     def pre_operation(self, properties):
         """

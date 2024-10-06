@@ -176,7 +176,7 @@ def export_file(properties, lod=0, file_type=FileTypes.FBX):
         for attribute_name in group_data.keys():
             export_settings[attribute_name] = settings.get_property_by_path(prefix, attribute_name, properties)
 
-    metadata.assign_custom_metadata()
+    metadata.assign_custom_metadata(properties)
 
     if file_type == FileTypes.FBX:
         export_fbx_file(file_path, export_settings)
@@ -526,6 +526,8 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
     :param object properties: The property group that contains variables that maintain the addon's correct state.
     :return list: A list of dictionaries containing the texture import data.
     """
+    texture_prefix = metadata.get_texture_affix(properties)
+    
     texture_data = {}
     if not properties.import_materials_and_textures:
         return texture_data
@@ -588,7 +590,7 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                                         image_name = image_name[len(f"{UCUPAINT_TITLE} "):]
                                     fmt = get_image_ext(image.file_format)
                                     # Remove image extension beforehand, since we dont know if name contains extension or not
-                                    filepath = f"{directory}\\{remove_image_ext(image_name)}.{fmt}"
+                                    filepath = f"{directory}\\{texture_prefix}{remove_image_ext(image_name)}.{fmt}"
                                     if filepath not in all_images_file_paths:
                                         image.save(filepath = filepath)
                                         all_images_file_paths.append(filepath)
@@ -600,7 +602,7 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                                     #channel = node.label if node.label in NODE_WRANGLER_TEXTURES else node.label[len(INPUT_PREFIX):]
                                     fmt = get_image_ext(node.image.file_format)
                                     # Remove image extension beforehand, since we dont know if name contains extension or not
-                                    filepath = f"{directory}\\{remove_image_ext(node.image.name)}.{fmt}"
+                                    filepath = f"{directory}\\{texture_prefix}{remove_image_ext(node.image.name)}.{fmt}"
                                     if filepath not in all_images_file_paths:
                                         node.image.save(filepath = filepath)
                                         all_images_file_paths.append(filepath)

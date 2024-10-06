@@ -12,6 +12,7 @@ venv
 .env
 .venv
 .*-venv
+.vscode/build.ps1
 results
 release
 site

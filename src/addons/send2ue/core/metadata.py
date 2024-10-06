@@ -43,6 +43,14 @@ def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Text
             image_dict[node.label[len("Baked "):]] = node
     return image_dict
 
+# Usually, properties = bpy.context.scene.send2ue
+def get_texture_affix(properties : "Send2UeSceneProperties") -> str:   
+    affix_props = properties.extensions.affixes
+    texture_prefix = ""
+    if affix_props.auto_add_asset_name_affixes:
+        texture_prefix = affix_props.texture_name_affix
+    return texture_prefix
+
 def default_vector():
     return [0,0,0,0]
 
@@ -80,9 +88,11 @@ class MaterialMetadata():
             return vector_input
     
     @staticmethod
-    def create_material_metadata(material : bpy.types.Material) -> 'MaterialMetadata':
+    def create_material_metadata(material : bpy.types.Material, properties : "Send2UeSceneProperties") -> 'MaterialMetadata':
         scalar_inputs : dict[str, ScalarInputMetadata] = {}
         vector_inputs : dict[str, VectorInputMetadata] = {}
+        
+        texture_prefix = get_texture_affix(properties)
         
         for node in material.node_tree.nodes:
             # Find Ucupaint group
@@ -105,7 +115,7 @@ class MaterialMetadata():
                         channel_name = channel if channel != "Color" else "Base Color" # Make consistent with Principled BSDF
                         if len(image_node.outputs[0].links) > 0:
                             socket_type = image_node.outputs[0].links[0].to_socket.type
-                            image_name = unreal_image_name(image_node.image.name[len("Ucupaint "):])
+                            image_name = texture_prefix + unreal_image_name(image_node.image.name[len("Ucupaint "):])
                             if socket_type == "RGBA" or socket_type == "VECTOR":
                                 MaterialMetadata.get_vector(vector_inputs, channel_name).texture_name = image_name
                             elif socket_type == "VALUE":
@@ -122,7 +132,7 @@ class MaterialMetadata():
                         label = node.label
                     else:
                         label = node.label[len(INPUT_PREFIX):]
-                    image_name = unreal_image_name(node.image.name)
+                    image_name = texture_prefix + unreal_image_name(node.image.name)
                     if len(node.outputs[0].links) > 0:
                         socket_type = node.outputs[0].links[0].to_socket.type
                         if socket_type == "RGBA" or socket_type == "VECTOR":
@@ -183,7 +193,7 @@ def get_empty_metadata() -> dict[str, Any]:
         "materials" : {}
     }
 
-def assign_custom_metadata():
+def assign_custom_metadata(properties : "Send2UeSceneProperties"):
     obj_dict = {}
     empty_dict = {}
     
@@ -193,7 +203,7 @@ def assign_custom_metadata():
         for i in range(len(obj.material_slots)):
             material = obj.material_slots[i].material
             fix_material_name(material)
-            metadata["materials"][material.name] = MaterialMetadata.create_material_metadata(material)
+            metadata["materials"][material.name] = MaterialMetadata.create_material_metadata(material, properties)
         
         obj_dict[obj] = metadata
         

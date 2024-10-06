@@ -4,6 +4,24 @@
 	"version": "2.0.0",
 	"tasks": [
         {
+            "label": "build",
+            "type": "shell",
+            "command": "./build.ps1",
+            "args": [],
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                // Reveal the output only if unrecognized errors occur.
+                "reveal": "silent"
+            },
+            // Use the standard MS compiler pattern to detect errors, warnings and infos
+            "problemMatcher": "$msCompile",
+            "options": {
+                "cwd": "${workspaceFolder}/.vscode"
+            },
+        },
+        {
             "label": "launch blender",
             "command": "python ${workspaceFolder}/scripts/launch.py blender ${input:blender-version} ${input:blender-debug}",
             "type": "shell",
