@@ -26,13 +26,13 @@ Then install [Ubuntu on Windows](https://ubuntu.com/tutorials/install-ubuntu-on-
 
 1. Install [Docker](https://docs.docker.com/get-docker/).
 1. Make sure docker is working by running `docker images`.
-1. Set the environment variable `TEST_ENVIRONMENT=1`.
+1. Set the environment variable `DOCKER_ENVIRONMENT=1`.
 1. Set the environment variable `GITHUB_TOKEN=your-personal access-token`. This is needed to pull the
    [unreal container image](https://docs.unrealengine.com/4.27/en-US/SharingAndReleasing/Containers/ContainersQuickStart/)
    if you don't already have it.
 ```shell
 set GITHUB_TOKEN=your-personal access-token
-set TEST_ENVIRONMENT=1
+set DOCKER_ENVIRONMENT=yes
 cd ./tests
 python run_tests.py
 ```
@@ -73,7 +73,7 @@ specific cases with `EXCLUSIVE_TESTS` can be beneficial.
 
 | Variables | Description                                                                                                                                                                                                                                                                                                                    | Default                                                                   |
 | -------------- |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| `TEST_ENVIRONMENT` | Whether to run the in the container test environment                                                                                                                                                                                                                                                                           | If no value is set, testing will run on the host                          |
+| `DOCKER_ENVIRONMENT` | Whether to run the in the container test environment                                                                                                                                                                                                                                                                           | If no value is set, testing will run on the host                          |
 | `EXCLUSIVE_TEST_FILES` | Whether to run tests exclusively on this list of test files. Comma seperated list.                                                                                                                                                                                                                                             | Runs all tests files by default                                           |
 | `EXCLUSIVE_TESTS` | Whether to run tests exclusively on this list of test names. Comma seperated list.                                                                                                                                                                                                                                             | Runs all tests cases by default                                           |
 | `REMOVE_CONTAINERS` | Whether to shutdown and remove the containers after testing. Testing will be faster if the containers don't have to restart                                                                                                                                                                                                    | `True` by default. Leave blank if you want the containers to keep running |

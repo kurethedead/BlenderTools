@@ -36,5 +36,5 @@ jobs:
     secrets: inherit
     with:
       title: Test Latest
-      unreal-version: 5.3
-      blender-version: 4.1
+      unreal-version: 5.4
+      blender-version: 4.2

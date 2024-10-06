@@ -32,56 +32,49 @@ cd BlenderTools
 git checkout some-task-branch
 ```
 
-## Testing your changes
+## VSCode
+The repo contains the tasks, launch actions, and settings for developing with vscode. To get setup do the following:
+
+### Setup
+1. Install the VSCode profile under `scripts/resources/profiles/dev.code-profile`. You can do this by typing `> Profile Import Profile` in the command pallette. This will give you all the vscode extensions you will need.
+1. Close and re-open VSCode
+1. Type `> Python: Create Environment`, hit enter and chose `Venv` and choose your Python 3.11 installation, then check the box to install the `requirements.txt`
+1. Close and re-open your integrated terminal in vscode and ensure that you now have a `(.venv)` prefixing your shell. If you do, you are all setup and ready to go!
+
+### Build Tasks
+The VSCode project has build tasks for launch your apps. It is highly recommended that you launch blender and unreal through these, since they will ensure you have the dev dependencies in your python environment for reloading code and debugging. To do this move your cursor over the integrate terminal and press the hot keys `CTRL+SHIFT+B`. 
+
+![2.1](./images/development/2.1.gif)
+
+!!! note
+    If you choose yes to debug, the app will hang until you attach to it via debugpy in VSCode. (See Launch Actions)
+
+!!! note
+    The launch scripts look for the unreal and blender executables in their default locations. You can override the exe paths by setting
+    the `UNREAL_EXE_PATH`and `BLENDER_EXE_PATH` variables in a `.env` file in the repo root.
+
+### Launch Actions
+Several launch actions have been created for debugging. Use the `Python Debugger: Attach Blender` or `Python Debugger: Attach Unreal` to attach to the apps after they have been launched from the build tasks and have logged that they are waiting for the debugger to attach. There are also a few other debug configurations for the test cases as well.
+
+![2.2](./images/development/2.2.png)
+
+## Reloading your changes
 While developing, you will want to be able to rapidly test your new changes. You can do this by running this script in
 the Blender Script Editor.
 
 !!! note
   
-    You need to change `<your-repo-location>` to match the absolute path to the scripts folder in your local project. Running this script installs and reloads the tool.
+    If your didn't launch from VSCode, You need to change `<your-repo-location>` to match the absolute path to the scripts folder in your local project. Running this script reloads the addon code.
 
 
 ```python
-import bpy
 import sys
 sys.path.append(r'C:\<your-repo-location>\BlenderTools\scripts')
 import dev_helpers
-
-addons = ['send2ue', 'ue2rigify']
-
-# installs the actual addons zips
-#dev_helpers.reload_addon_zips(addons)
-
-# reloads the code from your repo. A lot faster but doesn't load addon preferences
-dev_helpers.reload_addon_source_code(addons)
-
-# start blender and unreal rpc server for automated testing
-#bpy.ops.send2ue.start_rpc_servers()
+dev_helpers.reload_addon_source_code(['send2ue', 'ue2rigify'])
 ```
 
-In most cases you can get away with running `dev_helpers.reload_addon_source_code`, which reloads very fast and any
-stack traces get linked back to the repo code.
-
-However, the true test is running `dev_helpers.reload_addon_zips` this actually zips up the code and installs the
-addons. You will need to do this if you are testing features that rely on properties in the addon preferences.
-
-`bpy.ops.send2ue.start_rpc_servers()` Ensures that both unreal and blender rpc servers are running. This is needed if
-you want to run the unittests on the open app instances.
-
-## Hot reloading from PyCharm
-These steps must be completed in-order for the addons to hot-reload while you type in PyCharm.
-1. If you have the addons already installed, uninstall them and shutdown Blender and PyCharm.
-1. You must symlink the addon folders into the blender addon installation location. Then enable the addons
-
-!!! Windows
-    Run this from a commandline launched as administrator. Swapping out the last path with your own.
-    ```shell
-    mklink /D "%APPDATA%\Blender Foundation\Blender\3.6\scripts\addons\send2ue" "D:\repos\BlenderTools\send2ue"
-    ```
-
-1. You must install the `./scripts/addon-watcher.xml` in Pycharm by going to `Settings > Tools > File Watchers > Import`
-1. And finally blender has to be running with the send2ue addon enabled and clicking `Pipeline > Utilities > Start RPC Servers`
-Now PyCharm should reload your addons on file save events.
+In most cases you can get away with running `dev_helpers.reload_addon_source_code`, which reloads your addon code without restarting blender.
 
 
 ## Code Structure

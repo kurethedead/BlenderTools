@@ -47,7 +47,7 @@ class BlenderRemoteCalls:
         Installs the given addons from the release folder.
         """
         for addon in addons:
-            addon_folder_path = os.path.join(repo_folder, addon)
+            addon_folder_path = os.path.join(repo_folder, 'src', 'addons', addon)
             release_folder = os.path.join(repo_folder, 'release')
             addon_packager = AddonPackager(addon, addon_folder_path, release_folder)
             addon_packager.install_addon()

@@ -1,0 +1,90 @@
+// See https://go.microsoft.com/fwlink/?LinkId=733558
+// for the documentation about the tasks.json format
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+            "label": "launch blender",
+            "command": "python ${workspaceFolder}/scripts/launch.py blender ${input:blender-version} ${input:blender-debug}",
+            "type": "shell",
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true
+            }
+        },
+        {
+            "label": "launch unreal",
+            "command": "python ${workspaceFolder}/scripts/launch.py unreal ${input:unreal-version} ${input:unreal-debug}",
+            "type": "shell",
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true
+            }
+        },
+        {
+            "label": "Serve Docs",
+            "command": "mkdocs serve",
+            "type": "shell",
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true
+            }
+        }
+	],
+    "inputs": [
+        {
+            "id": "blender-version",
+            "type": "pickString",
+            "default": "4.1",
+            "options": [
+              "3.6",
+              "4.0",
+              "4.1",
+              "4.2",
+            ],
+            "description": "What blender version to launch"
+        },
+        {
+            "id": "blender-debug",
+            "type": "pickString",
+            "default": "no",
+            "options": [
+              "no",
+              "yes"
+            ],
+            "description": "Should use debugger?"
+        },
+        {
+            "id": "unreal-version",
+            "type": "pickString",
+            "default": "5.4",
+            "options": [
+              "5.3",
+              "5.4"
+            ],
+            "description": "What unreal version to launch"
+        },
+        {
+            "id": "unreal-debug",
+            "type": "pickString",
+            "default": "no",
+            "options": [
+              "no",
+              "yes"
+            ],
+            "description": "Should use debugger?"
+        }
+    ]
+}

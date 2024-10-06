@@ -8,6 +8,7 @@ import threading
 import unittest
 import docker
 import docker.errors
+from docker.types import Mount
 import xmlrunner
 import shutil
 import inspect
@@ -76,7 +77,8 @@ class ContainerTestManager:
             poll_interval=1,
             additional_python_paths=None,
             exclusive_test_files=None,
-            exclusive_tests=None
+            exclusive_tests=None,
+            shared_volumes=None,
     ):
 
         self.test_case_container_folder = os.environ.get('CONTAINER_TEST_FOLDER', '/tmp/test_cases/')
@@ -93,6 +95,7 @@ class ContainerTestManager:
         self.exclusive_test_files = exclusive_test_files or []
         self.additional_python_paths = additional_python_paths or []
         self.exclusive_tests = exclusive_tests or []
+        self.shared_volumes = shared_volumes or {}
         self._test_case_ids = []
 
         self.logger = logging.getLogger(f'{self.__class__.__name__}')
@@ -116,6 +119,24 @@ class ContainerTestManager:
         self.services_summary = {}
         self.should_continue = True
         self.test_suite = unittest.TestSuite()
+
+    def _get_shared_volumes(self):
+        volumes = []
+        for volume_name in self.shared_volumes.keys():
+            if volume_name not in [volume.name for volume in self.docker_client.volumes.list()]: # type: ignore
+                self.logger.info(f'Created volume "{volume_name}" ...')
+                volume = self.docker_client.volumes.create(
+                    name=volume_name,
+                    driver='local'
+                )
+                self.logger.info(f'Created "{volume_name}"!')
+                volumes.append(volume)
+            else:
+                for volume in self.docker_client.volumes.list():
+                    if volume.name == volume_name: # type: ignore
+                        volumes.append(volume)
+                        break
+        return volumes
 
     def _call_on_all_services(self, callable_instance, **kwargs):
         """
@@ -381,13 +402,17 @@ class ContainerTestManager:
         for name, data in self.images.items():
             refresh = data.get('refresh', True)
             rpc_port = data.get('rpc_port')
+            debug_port = data.get('debug_port')
             additional_packages = data.get('additional_packages', [])
             repository = data.get('repository')
             tag = data.get('tag')
             command = data.get('command', [])
             user = data.get('user')
             ports = data.get('ports', {})
-            ports.update({f'{rpc_port}/tcp': ('127.0.0.1', rpc_port)})
+            ports.update({
+                f'{rpc_port}/tcp': ('127.0.0.1', rpc_port),
+                f'{debug_port}/tcp': ('127.0.0.1', debug_port)
+            })
             entrypoint = data.get('entrypoint')
             environment = data.get('environment', {})
             environment.update({
@@ -396,9 +421,29 @@ class ContainerTestManager:
                 'RPC_HOST': '0.0.0.0'
             })
 
+            mounts = []
+            volume_configs = {}
             volumes = data.get('volumes', [])
             volumes = volumes + self.get_package_volume_mounts(additional_packages)
             volumes.append(f'{self.test_case_folder}:{self.test_case_container_folder}')
+
+
+            # make all volumes read write
+            for volume in volumes:
+                source, destination = volume.split(':/')
+                volume_configs[source] = {'bind': f'/{destination}', 'mode': 'rw'}
+
+            # add the shared volumes
+            for volume in self._get_shared_volumes():
+                container_path = self.shared_volumes.get(volume.name)
+                mounts.append(
+                    Mount(
+                        target=container_path, 
+                        source=volume.name, 
+                        type='volume', 
+                        read_only=False
+                    )
+                )
 
             image = f'{repository}/{tag}'
             if not repository:
@@ -421,7 +466,8 @@ class ContainerTestManager:
                     image=image,
                     command=command,
                     user=user,
-                    volumes=volumes,
+                    volumes=volume_configs,
+                    mounts=mounts,
                     ports=ports,
                     entrypoint=entrypoint,
                     environment=environment,
@@ -445,6 +491,18 @@ class ContainerTestManager:
                 container.remove(force=True)
                 self.logger.debug(f'Removed container {container_name}')
                 self.services_summary.update({container_name: {'stats': stats, 'inspect_data': inspect_data}})
+
+    def remove_volumes(self):
+        """
+        Removes all volumes.
+        """
+        for volume_name in self.shared_volumes.keys():
+            try:
+                volume = client.volumes.get(volume_name)# type: ignore
+                volume.remove()
+                self.logger.debug(f"Volume '{volume_name}' successfully deleted.")
+            except:
+                pass
 
     def await_service(self, service_name, rpc_client):
         """
@@ -607,4 +665,5 @@ class ContainerTestManager:
         for thread in self.log_streaming_threads:
             thread.join()
 
+        self.remove_volumes()
         self.log_summary()

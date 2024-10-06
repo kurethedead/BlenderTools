@@ -12,9 +12,9 @@
 
 Extensions provide a python interface for Send to Unreal users to quickly and cleanly extend its functionality
 with a minimal amount of code. Within an extension class several things can be defined:
-* [Tasks](/customize/extensions.html#tasks)
-* [Properties](/customize/extensions.html#properties)
-* [Draws](/customize/extensions.html#draws)
+* [Tasks](#tasks)
+* [Properties](#properties)
+* [Draws](#draws)
 
 ![1](./images/extensions/1.svg)
 
@@ -92,7 +92,7 @@ console and that the cube got sent to the `/Game/example_extension/test/` folder
 
 This same approach can be applied to many other use cases where you need to extend the Send to Unreal operation.
 For practical examples check out the
-[send2ue/resources](https://github.com/poly-hammer/BlenderTools/tree/master/send2ue/resources/extensions) folder.
+[send2ue/resources](https://github.com/poly-hammer/BlenderTools/tree/master/src/addons/send2ue/resources/extensions) folder.
 
 ## Tasks
 Tasks contain logic for key points within the runtime of the send to unreal
@@ -330,10 +330,9 @@ There is a submodule within `send2ue` that can be used to make your own rpc call
 a basic example of how you can force an asset to be renamed in the `post_import` method of an extension.
 ```python
 from send2ue.core.extension import ExtensionBase
-from send2ue.dependencies.unreal import remote_unreal_decorator
+from send2ue.dependencies.rpc.factory import make_remote
 
 
-@remote_unreal_decorator
 def rename_unreal_asset(source_asset_path, destination_asset_path):
     if unreal.EditorAssetLibrary.does_asset_exist(destination_asset_path):
         unreal.EditorAssetLibrary.delete_asset(destination_asset_path)
@@ -343,11 +342,10 @@ class ExampleExtension(ExtensionBase):
     name = 'example'
     def post_import(self):
         asset_path = self.asset_data[self.asset_id]['asset_path']
-        rename_unreal_asset(asset_path, f'{asset_path}_renamed_again')
+        remote_rename_unreal_asset = make_remote(rename_unreal_asset)
+        remote_rename_unreal_asset(asset_path, f'{asset_path}_renamed_again')
 ```
-Notice how you can define remote unreal functions on the fly by just wrapping your function
-with the `remote_unreal_decorator`. The RPC library has a factory that takes care of teleporting
-your code and imports over to the open unreal editor.
+Notice how you can define remote unreal functions on the fly by just passing a function reference to the `make_remote` function. The RPC library has a factory that takes care of teleporting your code and imports over to the open unreal editor.
 
 !!! note
 

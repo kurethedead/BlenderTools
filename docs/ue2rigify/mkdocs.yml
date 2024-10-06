@@ -1,6 +1,7 @@
-site_name: UE to Rigify
+site_name: ue2rigify
 docs_dir: '.'
 nav:
+  - Overview: "./index.md"
   - Quick Start: "./introduction/quickstart.md"
   - Concepts: 
     - Modes: "./concepts/modes.md"
@@ -12,6 +13,10 @@ nav:
     - Relink Constraints: "./advanced/relink-constraints.md"
   - Extras: 
     - Community Templates: "./extras/community-templates.md"
+  - User Interface:
+    - 3D View Panel: "./user-interface/3d-view-panel.md"
+    - Node Editor Panel: "./user-interface/node-editor-panel.md"
+    - Hotkeys: "./user-interface/hot-keys.md"
   - Trouble Shooting: 
     - FAQ: "./trouble-shooting/faq.md"
     - Errors: "./trouble-shooting/errors.md"

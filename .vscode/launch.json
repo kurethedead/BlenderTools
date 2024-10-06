@@ -1,0 +1,140 @@
+{
+  "configurations": [
+    {
+      "name": "Run Active Python File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false
+    },
+    {
+      "name": "Python Debugger: Attach Blender",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      }
+    },
+    {
+      "name": "Python Debugger: Attach Unreal",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5679
+      }
+    },
+    {
+      "name": "Debug Tests: Host Environment",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/run_tests.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "cwd": "${workspaceFolder}/tests",
+      "justMyCode": false,
+      "env": {
+        "EXCLUSIVE_TEST_FILES": "${input:test-file}",
+        "EXCLUSIVE_TESTS": "${input:test-name}",
+      }
+    },
+    {
+      "name": "Debug Tests: Docker Environment",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/run_tests.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "cwd": "${workspaceFolder}/tests",
+      "justMyCode": false,
+      "env": {
+        "DOCKER_ENVIRONMENT": "yes",
+        "EXCLUSIVE_TEST_FILES": "${input:test-file}",
+        "EXCLUSIVE_TESTS": "${input:test-name}",
+        "DEBUGGING_ON": "${input:debugging-on}"
+      }
+    },
+    {
+      "name": "Python Debugger: Attach Blender Docker",
+      "type": "debugpy",
+      "request": "attach",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/",
+          "remoteRoot": "/tmp/blender_tools/"
+        }
+      ],
+      "connect": {
+        "host": "localhost",
+        "port": 5668
+      }
+    },
+    {
+      "name": "Python Debugger: Attach Unreal Docker",
+      "type": "debugpy",
+      "request": "attach",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/",
+          "remoteRoot": "/tmp/blender_tools/"
+        }
+      ],
+      "connect": {
+        "host": "localhost",
+        "port": 5669
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "test-file",
+      "type": "pickString",
+      "default": "all",
+      "options": [
+        "all",
+        "test_send2ue_core.py",
+        "test_send2ue_cubes.py",
+        "test_send2ue_extension_affixes.py",
+        "test_send2ue_extension_combine_assets.py",
+        "test_send2ue_extension_create_post_import_assets_for_groom.py",
+        "test_send2ue_extension_example.py",
+        "test_send2ue_extension_instance_assets.py",
+        "test_send2ue_extension_use_collections_as_folders.py",
+        "test_send2ue_extension_use_immediate_parent_name.py",
+        "test_send2ue_mannequins.py",
+        "test_ue2rigify_core.py",
+        "test_ue2rigify_mannequins.py"
+      ],
+      "description": "Which test file to run"
+    },
+    {
+      "id": "docker-environment",
+      "type": "pickString",
+      "default": "",
+      "options": [
+        "no",
+        "yes"
+      ],
+      "description": "Run in docker environment?"
+    },
+    {
+      "id": "test-name",
+      "type": "promptString",
+      "default": "all",
+      "description": "The name of the specific test to run"
+    },
+    {
+      "id": "debugging-on",
+      "type": "pickString",
+      "default": "",
+      "options": [
+        "no",
+        "yes"
+      ],
+      "description": "Turn on remote debugging in the containers?"
+    }
+  ]
+}

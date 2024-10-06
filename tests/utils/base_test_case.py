@@ -14,12 +14,14 @@ class BaseTestCase(unittest.TestCase):
         self.test_environment = os.environ.get('TEST_ENVIRONMENT')
         self.test_folder = os.environ.get('HOST_TEST_FOLDER')
         self.repo_folder = os.environ.get('HOST_REPO_FOLDER')
+        sys.path.append(os.path.join(self.repo_folder, 'src', 'addons'))
         if self.test_environment:
             self.test_folder = os.environ.get('CONTAINER_TEST_FOLDER')
             self.repo_folder = os.environ.get('CONTAINER_REPO_FOLDER')
+            sys.path.append(f'{self.repo_folder}/src/addons')
+
         self.addons_folder = os.path.join(self.repo_folder, 'release')
 
-        sys.path.append(self.repo_folder)
         import send2ue
         import ue2rigify
         self.send2ue = send2ue
@@ -27,8 +29,9 @@ class BaseTestCase(unittest.TestCase):
 
         from utils.blender import BlenderRemoteCalls
         from send2ue.dependencies.unreal import UnrealRemoteCalls
+        from send2ue.dependencies.rpc.factory import make_remote
         self.blender = BlenderRemoteCalls
-        self.unreal = UnrealRemoteCalls
+        self.unreal = make_remote(UnrealRemoteCalls)
 
     def setUp(self):
         # load in the object from the file you will run tests with
@@ -39,7 +42,6 @@ class BaseTestCase(unittest.TestCase):
             self.blender.open_default()
 
         if os.environ.get('TEST_ENVIRONMENT'):
-            self.blender.install_addons(self.repo_folder, self.blender_addons)
             self.blender.send2ue_setup_project()
         else:
             for addon_name in self.blender_addons:
@@ -399,7 +401,7 @@ class BaseSend2ueTestCase(BaseTestCase):
             self.log(f'Ensuring that "{asset_name}" exists...')
             self.assertTrue(
                 self.unreal.asset_exists(f'{folder_path}{asset_name}'),
-                f'The "{asset_name}" does not exist in unreal!'
+                f'The "{asset_name}" does not exist in unreal! Loc: {folder_path}'
             )
         else:
             self.log(f'Ensuring that "{asset_name}" does not exist...')
@@ -432,14 +434,15 @@ class BaseSend2ueTestCase(BaseTestCase):
         folder_path = self.blender.get_addon_property('scene', 'send2ue', 'unreal_groom_folder_path')
         self.assert_asset_exists(asset_name, folder_path, exists)
 
-    def assert_binding_asset(self, groom_asset_name, target_mesh_name, mesh_folder_path=None):
+    def assert_binding_asset(self, groom_asset_name, target_mesh_name, mesh_folder_path=None, groom_folder_path=None):
         self.log(f'Checking that binding asset is created correctly for "{groom_asset_name}"...')
 
         binding_asset_name = f'{groom_asset_name}_{target_mesh_name}_Binding'
 
         if not mesh_folder_path:
             mesh_folder_path = self.blender.get_addon_property('scene', 'send2ue', 'unreal_mesh_folder_path')
-        groom_folder_path = self.blender.get_addon_property('scene', 'send2ue', 'unreal_groom_folder_path')
+        if not groom_folder_path:
+            groom_folder_path = self.blender.get_addon_property('scene', 'send2ue', 'unreal_groom_folder_path')
 
         self.assert_asset_exists(binding_asset_name, groom_folder_path, True)
 

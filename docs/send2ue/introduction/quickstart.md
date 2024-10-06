@@ -45,7 +45,7 @@ Once you have enabled the plugins and project settings, you'll be prompted to re
 
 ![7](./images/7.png)
 
-Search for "python" and then enable remote execution. Now Send to Unreal will work with your new Unreal project.
+Search for "python" and then enable `remote execution` and set the Multicast bind address to `0.0.0.0` if you are not using a Windows machine, otherwise leave this set to `127.0.0.1`. Now Send to Unreal will work with your new Unreal project.
 
 ![8](./images/8.png)
 
@@ -85,4 +85,4 @@ Congrats, Send to Unreal is now working! To customize Send to Unreal to your nee
 `Pipeline > Export > Settings Dialog`. Here you can customize the paths for exports and imports
 as well as the export and import settings, and validations.
 
-<img src="./images/15.png" alt="15" width="450"/>
+![15](./images/15.png)

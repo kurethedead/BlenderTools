@@ -38,6 +38,7 @@ class ReleaseAddon:
         release_notes_file_path = os.path.join(
             os.path.dirname(__file__),
             os.pardir,
+            'src/addons',
             self.addon_name,
             'release_notes.md'
         )
@@ -134,7 +135,7 @@ def package_addons(addon_release_folder):
 
     # package the addons
     for addon_name in BLENDER_ADDONS:
-        addon_folder_path = os.path.join(PROJECT_FOLDER, addon_name)
+        addon_folder_path = os.path.join(PROJECT_FOLDER, 'src', 'addons', addon_name)
         addon_packager = AddonPackager(addon_name, addon_folder_path, addon_release_folder)
         addon_packager.zip_addon()
 
