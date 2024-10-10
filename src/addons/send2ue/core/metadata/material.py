@@ -1,7 +1,6 @@
-import bpy, json
-from dataclasses import dataclass, asdict, field
-from typing import Any
-from .texture_constants import *
+import bpy
+from dataclasses import dataclass, field
+from ..texture_constants import *
 
 # This creates material metadata for unreal assets. This is a specialized setup to handle Ucupaint and Node Wrangler setups.
 # https://github.com/ucupumar/ucupaint
@@ -13,7 +12,6 @@ from .texture_constants import *
 # 4. Any other applicable node whose label starts with the specified input prefix
 # 5. Most unconnected input sockets on the Principled BSDF node (other shader nodes not supported)
 
-METADATA_NAME = "blender_metadata"
 
 def unreal_image_name(name : str) -> str:
     # remove file extension
@@ -23,18 +21,6 @@ def unreal_image_name(name : str) -> str:
     for c in INVALID_FILENAME_CHARS:
         name = name.replace(c, "_")
     return name
-
-def unreal_material_name(name : str) -> str:
-    for c in INVALID_FILENAME_CHARS:
-        name = name.replace(c, "_")
-    return name
-
-def fix_material_name(material : bpy.types.Material):
-    material.name = unreal_material_name(material.name)
-    
-    # handle duplicate naming suffixes (ex. .001)
-    while "." in material.name:
-        material.name = unreal_material_name(material.name)
 
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
     image_dict = {}
@@ -172,69 +158,3 @@ class MaterialMetadata():
                     MaterialMetadata.get_scalar(scalar_inputs, "Emission Strength").default = node.inputs["Emission Strength"].default_value
         
         return MaterialMetadata(scalar_inputs, vector_inputs)
-    
-DATACLASSES = [
-    MaterialMetadata,
-    VectorInputMetadata,
-    ScalarInputMetadata
-]
- 
-class MetadataEncoder(json.JSONEncoder):
-    def default(self, o):
-        if type(o) in DATACLASSES:
-            return asdict(o)
-        return super().default(o)
-
-def get_mesh_objs() -> list[bpy.types.Object]:
-    return [obj for obj in bpy.data.collections['Export'].objects if obj.type == "MESH"]
-
-def get_empty_metadata() -> dict[str, Any]:
-    return {
-        "materials" : {}
-    }
-
-def assign_custom_metadata(properties : "Send2UeSceneProperties"):
-    obj_dict = {}
-    empty_dict = {}
-    
-    for obj in get_mesh_objs():
-        metadata = get_empty_metadata()
-        
-        for i in range(len(obj.material_slots)):
-            material = obj.material_slots[i].material
-            fix_material_name(material)
-            metadata["materials"][material.name] = MaterialMetadata.create_material_metadata(material, properties)
-        
-        obj_dict[obj] = metadata
-        
-        # Handle possible combine meshes option
-        # Send2ue uses immediate parent empties to group meshes into separate files, if combine meshes is enabled.
-        # However, unreal's "combine mesh" import option keeps only one mesh's metadata.
-        # Therefore, we need to combine all children's metadata and set it on each child.
-        # Results in redundancies, but only way to get around this.
-        
-        parent = get_highest_ancestor(obj)
-        
-        if parent and parent.type in ["EMPTY", "ARMATURE"]:
-            if parent not in empty_dict:
-                empty_dict[parent] = get_empty_metadata()
-            for key, value in empty_dict[parent].items():
-                if isinstance(value, dict):
-                    empty_dict[parent][key] = empty_dict[parent][key] | metadata[key]
-                    
-    for obj, data in obj_dict.items():
-        metadata = data
-        parent = get_highest_ancestor(obj)
-        if parent and parent.type in ["EMPTY", "ARMATURE"] and parent in empty_dict:
-            metadata = empty_dict[parent]
-        obj[METADATA_NAME] = json.dumps(metadata, cls = MetadataEncoder)
-
-def get_highest_ancestor(obj : bpy.types.Object):
-    parent = obj.parent
-    while parent and parent.type not in ["EMPTY", "ARMATURE"]:
-        parent = parent.parent
-    return parent
-
-def delete_custom_metadata():
-    for obj in get_mesh_objs():
-        del obj[METADATA_NAME]

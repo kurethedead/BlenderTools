@@ -78,5 +78,7 @@
         80,
         120
     ],
-    "jupyter.notebookFileRoot": "${workspaceFolder}"
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true
 }

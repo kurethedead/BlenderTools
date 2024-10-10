@@ -6,6 +6,7 @@ import uuid
 import bpy
 from .constants import ToolInfo, PathModes, Template
 from .core import settings, formatting, extension
+from .metadata_properties import register_metadata_properties, unregister_metadata_properties
 
 
 class Send2UeAddonProperties:
@@ -542,6 +543,7 @@ def register():
         bpy.types.WindowManager.send2ue = bpy.props.PointerProperty(type=Send2UeWindowMangerProperties)
 
     register_scene_properties()
+    register_metadata_properties()
 
 
 def unregister():
@@ -554,6 +556,7 @@ def unregister():
     extension_factory = extension.ExtensionFactory()
     extension_factory.remove_property_data()
     unregister_scene_properties()
+    unregister_metadata_properties()
 
     window_manager_property_class = bpy.types.PropertyGroup.bl_rna_get_subclass_py('Send2UeWindowMangerProperties')
     if window_manager_property_class:
