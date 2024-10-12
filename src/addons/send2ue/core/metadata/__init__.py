@@ -57,7 +57,7 @@ def assign_custom_metadata(properties : "Send2UeSceneProperties"):
         # Add armature metadata to mesh if armature is used.
         # See below comment about why this has to be done
         parent = get_highest_ancestor(obj)
-        if parent.type == "ARMATURE":
+        if parent and parent.type == "ARMATURE":
             if parent not in armature_dict:
                 armature_dict[parent] = ArmatureMetadata.create_armature_metadata(parent.data, properties)
             metadata["armature"] = armature_dict[parent]
