@@ -5,6 +5,17 @@ ARMATURE_CATEGORIES = [
     ("Observable", "Observable", "Mesh that has multiple moving parts that can play one-off anims independently that pause at end"),
 ]
 
+MESH_CATEGORIES = [
+    ("None", "None", "None"),
+    ("Observable", "Observable", "Mesh that has multiple moving parts that can play one-off anims independently that pause at end"),
+]
+
+class Send2UeMeshProperties(bpy.types.PropertyGroup):
+    category: bpy.props.EnumProperty(
+        name = "Category",
+        items = MESH_CATEGORIES
+    )
+    
 class Send2UeArmatureProperties(bpy.types.PropertyGroup):
     category: bpy.props.EnumProperty(
         name = "Category",
@@ -44,6 +55,30 @@ class Send2UeArmaturePanel(bpy.types.Panel):
         col.box().label(text="Send2UE Armature")
 
         col.prop(prop, "category")
+    
+class Send2UeMeshPanel(bpy.types.Panel):
+    bl_label = "Send2UE Mesh"
+    bl_idname = "OBJECT_PT_Send2UE_Mesh"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "object"
+    bl_options = {"HIDE_HEADER"}
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.object is not None
+            and isinstance(context.object.data, bpy.types.Mesh)
+            and False # TODO: Mesh properties unused for now, remove later?
+        )
+
+    def draw(self, context):
+        obj = context.object
+        prop = obj.data.send2ue_mesh
+        col = self.layout.column().box()
+        col.box().label(text="Send2UE Mesh")
+
+        col.prop(prop, "category")
 
 class Send2UeBonePanel(bpy.types.Panel):
     bl_label = "Send2UE Bone"
@@ -69,17 +104,21 @@ PROPERTY_CLASSES = [
     Send2UeArmatureProperties,
     Send2UeBoneProperties,
     Send2UeArmaturePanel,
-    Send2UeBonePanel
+    Send2UeBonePanel,
+    Send2UeMeshProperties,
+    Send2UeMeshPanel,
 ]
     
 def register_metadata_properties():
     for cls in PROPERTY_CLASSES:
         bpy.utils.register_class(cls)
     bpy.types.Armature.send2ue_armature = bpy.props.PointerProperty(type=Send2UeArmatureProperties)
+    bpy.types.Mesh.send2ue_mesh = bpy.props.PointerProperty(type=Send2UeMeshProperties)
     bpy.types.Bone.send2ue_bone = bpy.props.PointerProperty(type=Send2UeBoneProperties)
 
 def unregister_metadata_properties():
     del bpy.types.Armature.send2ue_armature
+    del bpy.types.Mesh.send2ue_mesh
     del bpy.types.Bone.send2ue_bone
     for cls in PROPERTY_CLASSES:
         bpy.utils.unregister_class(cls)

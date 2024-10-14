@@ -3,6 +3,7 @@ from dataclasses import dataclass, asdict, field
 from typing import Any
 from .material import MaterialMetadata, VectorInputMetadata, ScalarInputMetadata, get_texture_affix
 from .armature import ArmatureMetadata
+from .mesh import MeshMetadata
 from ..texture_constants import INVALID_FILENAME_CHARS
 
 METADATA_NAME = "blender_metadata"
@@ -12,13 +13,17 @@ DATACLASSES = [
     VectorInputMetadata,
     ScalarInputMetadata,
     ArmatureMetadata,
+    MeshMetadata,
 ]
  
 class MetadataEncoder(json.JSONEncoder):
     def default(self, o):
         if type(o) in DATACLASSES:
             return asdict(o)
-        return super().default(o)
+        try:
+            return super().default(o)
+        except TypeError:
+            raise TypeError(f"{type(o)} is not serializable, make sure metadata classes are added to DATACLASSES array.")
 
 def get_mesh_objs() -> list[bpy.types.Object]:
     return [obj for obj in bpy.data.collections['Export'].objects if obj.type == "MESH"]
@@ -27,6 +32,7 @@ def get_empty_metadata() -> dict[str, Any]:
     return {
         "materials" : {},
         "armature" : None,
+        "mesh" : None,
     }
 
 def unreal_material_name(name : str) -> str:
@@ -61,6 +67,9 @@ def assign_custom_metadata(properties : "Send2UeSceneProperties"):
             if parent not in armature_dict:
                 armature_dict[parent] = ArmatureMetadata.create_armature_metadata(parent.data, properties)
             metadata["armature"] = armature_dict[parent]
+            
+        # TODO: For combine mesh, this results in a random mesh's properties being chosen?
+        metadata["mesh"] = MeshMetadata.create_mesh_metadata(obj.data, properties)
         
         obj_dict[obj] = metadata
         

@@ -20,3 +20,5 @@ class ArmatureMetadata():
                 if bone_prop.is_observable_section:
                     observable_sections.append(bone.name)
             return ArmatureMetadata("Observable", observable_sections)
+        else:
+            raise Exception(f"Invalid armature category: {armature_prop.category}")
