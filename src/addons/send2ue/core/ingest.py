@@ -11,6 +11,20 @@ UnrealRemoteCalls = make_remote(UnrealCalls)
 
 
 @track_progress(message='Importing asset "{attribute}"...', attribute='file_path')
+def import_level_sequence(asset_id, property_data):
+    """
+    Imports a level sequence to unreal based on the asset data in the provided dictionary.
+
+    :param str asset_id: The unique id of the asset.
+    :param dict property_data: A dictionary representation of the properties.
+    """
+    # get the asset data
+    asset_data = bpy.context.window_manager.send2ue.asset_data[asset_id]
+    
+    if not asset_data.get('skip'):
+        UnrealRemoteCalls.import_level_sequence(asset_data, property_data)
+    
+@track_progress(message='Importing asset "{attribute}"...', attribute='file_path')
 def import_asset(asset_id, property_data):
     """
     Imports an asset to unreal based on the asset data in the provided dictionary.
@@ -153,7 +167,14 @@ def assets(properties):
             PathModes.SEND_TO_PROJECT.value,
             PathModes.SEND_TO_DISK_THEN_PROJECT.value
         ]:
+            level_sequence_asset_id = None
+            level_sequence_asset_data = None
             for asset_id, asset_data in bpy.context.window_manager.send2ue.asset_data.items():
+                if asset_data.get("_asset_type") == UnrealTypes.LEVEL_SEQUENCE:
+                    level_sequence_asset_id = asset_id
+                    level_sequence_asset_data = asset_data
+                    continue
+                
                 # imports static mesh, skeletal mesh, animation or groom
                 import_asset(asset_id, property_data)
 
@@ -166,3 +187,7 @@ def assets(properties):
                 # import sockets
                 if asset_data.get('sockets'):
                     create_static_mesh_sockets(asset_id)
+            
+            # import level sequence last after everything else
+            if level_sequence_asset_data is not None and properties.export_level_sequence:
+                import_level_sequence(level_sequence_asset_id, property_data)

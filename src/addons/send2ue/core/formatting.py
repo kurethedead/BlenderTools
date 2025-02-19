@@ -238,6 +238,16 @@ def update_unreal_groom_folder_path(self, context):
     auto_format_unreal_folder_path('unreal_groom_folder_path', self)
 
 
+def update_unreal_level_sequence_folder_path(self, context):
+    """
+    Called every time the unreal groom folder path is updated.
+
+    :param object self: This is a reference to the property data object.
+    :param object context: The context when the property was called.
+    """
+    auto_format_unreal_folder_path('unreal_level_sequence_folder_path', self)
+
+
 def update_unreal_skeleton_asset_path(self, context):
     """
     Called every time the unreal skeleton asset path is updated.

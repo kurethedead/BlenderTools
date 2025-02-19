@@ -634,6 +634,35 @@ def get_other_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Imag
                 image_dict[node.label[len(INPUT_PREFIX):]] = node.image
     return image_dict
 
+def create_level_sequence_data(rig_objects, properties):
+    """
+    Collects and creates all the asset data needed for the import process.
+
+    :param list rig_objects: A list of rig objects.
+    :param object properties: The property group that contains variables that maintain the addon's correct state.
+    :return list: A list of dictionaries containing the texture import data.
+    """
+    sequence_data = {}
+    
+    # save the import data
+    sequence_name = "BlenderLevelSequence"
+    asset_name = utilities.get_asset_name(sequence_name, properties)
+    #asset_id = utilities.get_asset_id(file_path)
+    asset_id = "LevelSequenceID" # since there is only one level sequence per export, this should be okay
+    
+    # TODO: create data
+    # We probably won't save to a file to import later
+    # Instead, we'll gather data and create asset from it
+    
+    sequence_data[asset_id] = {
+        '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
+        '_sequence_name': sequence_name,
+        'asset_path': f'{properties.unreal_level_sequence_folder_path}{asset_name}',
+        'asset_folder': properties.unreal_level_sequence_folder_path,
+        'skip': False
+    }
+    return sequence_data
+
 def create_asset_data(properties):
     """
     Collects and creates all the asset data needed for the import process.
@@ -663,9 +692,12 @@ def create_asset_data(properties):
     
     # get all textures, merge asset data into mesh asset data
     create_texture_data(mesh_objects, mesh_data, properties)
+    
+    # get level sequence data
+    level_sequence_data = create_level_sequence_data(rig_objects, properties)
 
     # update the properties with the asset data
-    bpy.context.window_manager.send2ue.asset_data.update({**mesh_data, **animation_data, **hair_data})
+    bpy.context.window_manager.send2ue.asset_data.update({**mesh_data, **animation_data, **hair_data, **level_sequence_data})
 
 
 def send2ue(properties):

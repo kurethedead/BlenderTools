@@ -913,6 +913,31 @@ class UnrealImportAsset(Unreal):
         return list(self._import_task.get_editor_property('imported_object_paths'))
 
 
+class UnrealImportLevelSequence(Unreal):
+    def __init__(self, asset_path, start=None, end=None):
+        """
+        Initializes the import with asset data and property data.
+
+        :param str asset_path: The project path to the asset.
+        :param str file_path: The full file path to the import file.
+        :param str track_name: The name of the track.
+        :param int start: The start frame.
+        :param int end: The end frame.
+        """
+        self._asset_path = asset_path
+        self._control_channel_mappings = []
+        #self._sequence = self.get_asset(asset_path)
+        self._control_rig_settings = unreal.MovieSceneUserImportFBXControlRigSettings()
+
+        if start and end:
+            self._control_rig_settings.start_time_range = int(start)
+            self._control_rig_settings.end_time_range = int(end)
+    
+    def run_import(self):
+        # assign the options object to the import task and import the asset
+        print(f"Importing level sequence to {self._asset_path}")
+        return []
+        
 class UnrealImportSequence(Unreal):
     def __init__(self, asset_path, file_path, track_name, start=None, end=None):
         """
@@ -1371,6 +1396,24 @@ class UnrealRemoteCalls:
         )
         # run the import task
         unreal_import_sequence.run_import()
+    
+    @staticmethod
+    def import_level_sequence(asset_data, property_data, start=None, end=None):
+        """
+        Initializes the import with asset data and property data.
+        """
+        
+        # TODO: Move data into UnrealImportLevelSequence, then script Unreal to create level sequence asset
+        
+        asset_path = asset_data.get('asset_path')
+        
+        unreal_import_level_sequence = UnrealImportLevelSequence(
+            asset_path=asset_path,
+            start=start,
+            end=start
+        )
+        # run the import task
+        unreal_import_level_sequence.run_import()
 
     @staticmethod
     def import_skeletal_mesh_lod(asset_path, file_path, index):

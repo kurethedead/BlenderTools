@@ -24,6 +24,7 @@ class UnrealTypes:
     STATIC_MESH = 'StaticMesh'
     ANIM_SEQUENCE = 'AnimSequence'
     GROOM = 'Groom'
+    LEVEL_SEQUENCE = "LevelSequence"
 
 
 class FileTypes:

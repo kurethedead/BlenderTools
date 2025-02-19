@@ -223,6 +223,15 @@ def get_scene_property_class():
                 "to this location in your open Unreal Project"
             )
         )
+        unreal_level_sequence_folder_path: bpy.props.StringProperty(
+            name="Level Sequence Folder (Unreal)",
+            default=r"/Game/untitled_category/untitled_asset/level_sequence/",
+            update=formatting.update_unreal_level_sequence_folder_path,
+            description=(
+                "This is the level sequence import path. Your level sequence will be imported "
+                "to this location in your open Unreal Project"
+            )
+        )
         unreal_skeleton_asset_path: bpy.props.StringProperty(
             name="Skeleton Asset (Unreal)",
             default=r"",
@@ -310,6 +319,11 @@ def get_scene_property_class():
                 "This forces the unreal asset to use the blender object origin instead of the blender scene's world"
                 " origin"
             )
+        )
+        export_level_sequence: bpy.props.BoolProperty(
+            name="Export level sequence",
+            default=False,
+            description="Whether or not to export level sequence from NLA"
         )
         import_meshes: bpy.props.BoolProperty(
             name="Meshes",
