@@ -3,7 +3,7 @@
 import json
 import math
 import os
-import bpy
+import bpy, bpy_extras, mathutils
 from . import utilities, validations, settings, ingest, extension, io
 from ..constants import BlenderTypes, UnrealTypes, FileTypes, PreFixToken, ToolInfo, ExtensionTasks
 from . import metadata
@@ -645,22 +645,138 @@ def create_level_sequence_data(rig_objects, properties):
     sequence_data = {}
     
     # save the import data
-    sequence_name = "BlenderLevelSequence"
+    sequence_name = bpy.path.basename(bpy.context.blend_data.filepath)[:-6] # remove .blend extension
     asset_name = utilities.get_asset_name(sequence_name, properties)
     #asset_id = utilities.get_asset_id(file_path)
     asset_id = "LevelSequenceID" # since there is only one level sequence per export, this should be okay
     
-    # TODO: create data
-    # We probably won't save to a file to import later
-    # Instead, we'll gather data and create asset from it
+    # basic params
+    scene = bpy.context.scene
+    start_frame = scene.frame_start
+    end_frame = scene.frame_end
+    framerate = scene.render.fps
+    
+    # get markers used for dialog system stopping points
+    markers = []
+    for marker in scene.timeline_markers:
+        # Ignore any default named frames (we do this to handle camera cut markers)
+        if marker.name.startswith("F_") and marker.name[2:].isdigit():
+            # keep track of cameras (in case a camera is static without NLA animations)
+            continue
+        markers.append({"name" : marker.name, "frame" : marker.frame})
+        
+    camera_objs : dict [bpy.types.Object, tuple[float, float]] = {} # camera object to frame range
+    camera_markers = [m for m in scene.timeline_markers if m.camera is not None]
+    for i, marker in enumerate(camera_markers):
+        if i == 0:
+            camera_start_frame = start_frame
+        else:
+            camera_start_frame = camera_markers[i].frame
+        
+        if i == len(camera_markers) - 1:
+            camera_end_frame = end_frame
+        else:
+            camera_end_frame = camera_markers[i + 1].frame
+        camera_objs[marker.camera] = (camera_start_frame, camera_end_frame)
+        
+    # null actions on objects, so only NLA influence is evaluated
+    for obj in bpy.context.view_layer.objects:
+        if obj.animation_data:
+            obj.animation_data.action.use_fake_user = True # TODO: Should we do this?
+            obj.animation_data.action = None
+        
+    # get tracks (actually, dont do this?)
+    '''
+    tracks = []
+    for camera_obj in camera_objs:
+        animation_data = camera_obj.animation_data
+        if animation_data:
+            for track in animation_data.nla_tracks: # TODO: just get last one?
+                for strip in track.strips:
+                    strip.action
+                    strip.action_frame_end
+                    strip.action_frame_start
+                    strip.blend_in
+                    strip.blend_out
+                    if strip.action:
+                        location_x = strip.action.fcurves.find("location", index = 0)
+                        location_y = strip.action.fcurves.find("location", index = 1)
+                        location_z = strip.action.fcurves.find("location", index = 2)
+                        if camera_obj.rotation_mode == "QUATERNION":
+                            break
+                        elif camera_obj.rotation_mode == "AXIS_ANGLE":
+                            break
+                        else:
+                            rotation_x = strip.action.fcurves.find("rotation_euler", index = 0)
+                            rotation_y = strip.action.fcurves.find("rotation_euler", index = 1)
+                            rotation_z = strip.action.fcurves.find("rotation_euler", index = 2)
+                        scale_x = strip.action.fcurves.find("scale", index = 0)
+                        scale_y = strip.action.fcurves.find("scale", index = 1)
+                        scale_z = strip.action.fcurves.find("scale", index = 2)
+                        visibility = strip.action.fcurves.find("hide_viewport", index = 2)
+                        for fcurve in strip.action:
+                            for keyframe in fcurve.keyframe_points:
+                                frame, value = keyframe.co[:]
+        else:
+            pass # TODO: handle static camera
+    '''
+        
+    # evaluate transform each frame
+    #anim_camera_objs = [obj for obj in camera_objs if obj.animation_data is not None]
+    #static_camera_objs = [obj for obj in camera_objs if obj.animation_data is None]
+    transform_tracks : dict[str, list[float]] = {}
+    for camera_obj, frame_range in camera_objs.items():
+        transform_tracks[camera_obj.name] = {
+            "type" : "Camera",
+            "frame_range" : frame_range,
+            "location_x" : [],
+            "location_y" : [],
+            "location_z" : [],
+            "rotation_x" : [],
+            "rotation_y" : [],
+            "rotation_z" : [],
+            "scale_x" : [],
+            "scale_y" : [],
+            "scale_z" : [],
+            "hide" : [],
+            "fov" : [],
+        }
+    for i in range(start_frame, end_frame + 1):
+        scene.frame_set(i)
+        for camera_obj, frame_range in camera_objs.items():
+            track = transform_tracks[camera_obj.name]
+            mm = mathutils.Matrix.Identity(4)
+            mm[1][1] = -1 # handle left vs right hand space
+            loc, rot, scale = (mm @ camera_obj.matrix_world @ mm.inverted()).decompose()
+            hide = camera_obj.hide_viewport
+            fov = math.degrees(camera_obj.data.angle)
+            
+            track["location_x"].append((i, loc[0] * 100)) # handle unreal-blender unit scale
+            track["location_y"].append((i, loc[1] * 100))
+            track["location_z"].append((i, loc[2] * 100))
+            track["rotation_x"].append((i, math.degrees(rot.to_euler()[0]) + 90)) # handle different camera orientation
+            track["rotation_y"].append((i, math.degrees(rot.to_euler()[1])))
+            track["rotation_z"].append((i, math.degrees(rot.to_euler()[2]) - 90))
+            track["scale_x"].append((i, scale[0]))
+            track["scale_y"].append((i, scale[1]))
+            track["scale_z"].append((i, scale[2]))
+            track["hide"].append((i, hide))
+            track["fov"].append((i, fov))
+
     
     sequence_data[asset_id] = {
         '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
-        '_sequence_name': sequence_name,
+        'sequence_name': asset_name,
         'asset_path': f'{properties.unreal_level_sequence_folder_path}{asset_name}',
         'asset_folder': properties.unreal_level_sequence_folder_path,
-        'skip': False
+        'skip': False,
+        'start_frame': start_frame,
+        'end_frame': end_frame,
+        'framerate': framerate,
+        'markers' : markers,
+        'tracks' : transform_tracks,
     }
+    print(str(sequence_data[asset_id]))
     return sequence_data
 
 def create_asset_data(properties):
