@@ -222,24 +222,27 @@ def get_action_names(rig_object, all_actions=True):
     if rig_object:
         if rig_object.animation_data:
             for nla_track in rig_object.animation_data.nla_tracks:
+                if nla_track.is_override_data:
+                    continue # ignore linked tracks, since they aren't deletable
+                
                 # if solo only return the actions in that track
                 if nla_track.is_solo and not all_actions:
                     action_names = []
                     for strip in nla_track.strips:
-                        if strip.action:
+                        if strip.action and strip.action.library is None: # ignore linked actions
                             return [strip.action.name]
 
                 # get all the action names if the all flag is set
                 if all_actions:
                     for strip in nla_track.strips:
-                        if strip.action:
+                        if strip.action and strip.action.library is None: # ignore linked actions
                             action_names.append(strip.action.name)
 
                 # otherwise get only the un-muted actions
                 else:
                     if not nla_track.mute:
                         for strip in nla_track.strips:
-                            if strip.action:
+                            if strip.action and strip.action.library is None: # ignore linked actions
                                 action_names.append(strip.action.name)
     return action_names
 
@@ -445,6 +448,10 @@ def get_skeleton_asset_path(rig_object, properties, get_path_function=get_import
     :param callable get_path_function: A function that gets the import path.
     :return str: The game path to the unreal skeleton asset.
     """
+    # return rig specific paths
+    if rig_object.send2ue_armature.skeleton_asset_path:
+        return rig_object.send2ue_armature.skeleton_asset_path
+    
     # if a skeleton path is provided
     if properties.unreal_skeleton_asset_path:
         return properties.unreal_skeleton_asset_path

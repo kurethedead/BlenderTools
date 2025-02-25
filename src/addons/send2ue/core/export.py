@@ -681,7 +681,7 @@ def create_level_sequence_data(rig_objects, properties):
         
     # null actions on objects, so only NLA influence is evaluated
     for obj in bpy.context.view_layer.objects:
-        if obj.animation_data:
+        if obj.animation_data and obj.animation_data.action:
             obj.animation_data.action.use_fake_user = True # TODO: Should we do this?
             obj.animation_data.action = None
         
@@ -724,7 +724,7 @@ def create_level_sequence_data(rig_objects, properties):
     # evaluate transform each frame
     #anim_camera_objs = [obj for obj in camera_objs if obj.animation_data is not None]
     #static_camera_objs = [obj for obj in camera_objs if obj.animation_data is None]
-    transform_tracks : dict[str, list[float]] = {}
+    transform_tracks : dict[str, object] = {}
     for camera_obj, frame_range in camera_objs.items():
         transform_tracks[camera_obj.name] = {
             "type" : "Camera",
@@ -763,7 +763,29 @@ def create_level_sequence_data(rig_objects, properties):
             track["hide"].append((i, hide))
             track["fov"].append((i, fov))
 
-    
+    anim_tracks = []
+    for rig_object in rig_objects:
+        if rig_object:
+            if rig_object.send2ue_armature.get_path() == "":
+                print(f"{rig_object.name} does not have an actor path set for its appropriate mode, skipping.")
+                continue
+            if rig_object.animation_data and len(rig_object.animation_data.nla_tracks) > 0:
+                nla_track = rig_object.animation_data.nla_tracks[-1]
+                for strip in nla_track.strips:
+                    if strip.action:
+                        action_name = strip.action.name
+                        anim_asset_name = utilities.get_asset_name(action_name, properties)
+                        anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
+                        anim_tracks.append({
+                            "type" : "Animation",
+                            "frame_range" : (strip.frame_start, strip.frame_end),
+                            "anim_asset_path" : anim_asset_path,
+                            "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
+                            "actor_path" : rig_object.send2ue_armature.get_path(),
+                            "actor_category" : rig_object.send2ue_armature.actor_category,
+                        })
+
+
     sequence_data[asset_id] = {
         '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
         'sequence_name': asset_name,
@@ -775,8 +797,9 @@ def create_level_sequence_data(rig_objects, properties):
         'framerate': framerate,
         'markers' : markers,
         'tracks' : transform_tracks,
+        'anim_tracks' : anim_tracks,
     }
-    print(str(sequence_data[asset_id]))
+    #print(str(sequence_data[asset_id]))
     return sequence_data
 
 def create_asset_data(properties):

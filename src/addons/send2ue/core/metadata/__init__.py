@@ -69,7 +69,7 @@ def assign_custom_metadata(properties : "Send2UeSceneProperties"):
             metadata["armature"] = armature_dict[parent]
             
         # TODO: For combine mesh, this results in a random mesh's properties being chosen?
-        metadata["mesh"] = MeshMetadata.create_mesh_metadata(obj.data, properties)
+        metadata["mesh"] = MeshMetadata.create_mesh_metadata(obj, properties)
         
         obj_dict[obj] = metadata
         

@@ -938,6 +938,7 @@ class UnrealImportLevelSequence(Unreal):
         asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
         actor_system = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
         ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
+        level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
   
         # create sequence
         sequence_name = self.asset_data["sequence_name"]
@@ -1001,6 +1002,40 @@ class UnrealImportLevelSequence(Unreal):
             
             ls_system.convert_to_spawnable(camera_binding)
         
+        # add anim sections
+        anim_tracks = {} # (actor_path, is_spawnable) : anim track
+        for track in self.asset_data["anim_tracks"]:
+            actor_path = track["actor_path"]
+            is_spawnable = track["actor_category"] == "Spawnable"
+            #level_actor = actor_system.get_actor_reference(unreal_actor_name)
+            print(actor_path)
+            #level_actor = unreal.find_object(level_editor.get_current_level(), unreal_actor_name)
+            # Create a cine camera actor
+            
+            anim_track = anim_tracks.get((actor_path, is_spawnable))
+            if anim_track is None:
+                if is_spawnable:
+                    actor_asset = unreal.load_asset(actor_path)
+                    level_actor = unreal.EditorLevelLibrary().spawn_actor_from_object(actor_asset, unreal.Vector(0,0,0), unreal.Rotator(0,0,0))
+                else:
+                    level_actor = unreal.find_object(level_editor.get_current_level(), actor_path)
+
+                # Add a spawnable using that cine camera actor
+                actor_binding = level_sequence.add_possessable(level_actor)
+                anim_track = actor_binding.add_track(unreal.MovieSceneSkeletalAnimationTrack)
+                anim_tracks[(actor_path, is_spawnable)] = anim_track
+                
+            anim_section = anim_track.add_section()
+            frame_range = track["frame_range"]
+            anim_section.set_range(*frame_range)
+
+            # set MovieSceneSkeletalAnimationTrack animation asset
+            anim_seq = unreal.load_asset(track["anim_asset_path"])
+            anim_section.params.animation = anim_seq
+             
+            if is_spawnable:   
+                ls_system.convert_to_spawnable(actor_binding)
+            
         # add marked frames
         for marker in self.asset_data["markers"]:
             marked_frame = unreal.MovieSceneMarkedFrame(self.get_frame(marker["frame"], level_sequence), marker["name"], True)
