@@ -30,6 +30,15 @@ class Send2UeArmatureProperties(bpy.types.PropertyGroup):
     skeleton_asset_path: bpy.props.StringProperty(
         name = "Skeleton Path",
         override={"LIBRARY_OVERRIDABLE"},
+        description = "Unreal path for skeleton asset. If empty, path will fallback to scene property value. Can be found by RMB asset -> Copy Reference"
+    )
+    
+    # Warning: utilities.get_import_path() doesn't take this into account.
+    # However, that function doesn't seem to be used for animation exporting in way that would miss this.
+    anim_asset_path: bpy.props.StringProperty(
+        name = "Animation Path (Linked)",
+        override={"LIBRARY_OVERRIDABLE"},
+        description = "Unreal path for anim folder for linked actions, which are assumed to be already exported. Must be terminated with a slash"
     )
     
     actor_category: bpy.props.EnumProperty(
@@ -111,6 +120,7 @@ class Send2UeArmaturePanel(bpy.types.Panel):
 
         col.prop(prop, "category")
         col.prop(prop, "skeleton_asset_path")
+        col.prop(prop, "anim_asset_path")
         col.prop(prop, "actor_category")
         if prop.actor_category == "Spawnable":
             col.prop(prop, "actor_asset_path")

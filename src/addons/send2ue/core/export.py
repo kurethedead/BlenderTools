@@ -637,6 +637,16 @@ def get_other_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Imag
 def create_level_sequence_data(rig_objects, properties):
     """
     Collects and creates all the asset data needed for the import process.
+    
+    Importer Quirks:
+        - Marker Naming
+            - markers in the format F_### will be ignored for marker import, but not for camera shot import
+        - linked objects must be made fully local, or else:
+            - actor/skeletal path properties on object won't be saved
+            - NLA tracks/strips can't be editted
+        - Note that linked actions are assumed to already by exported using their rig_object's anim_asset_path.
+        - Make sure linked animations have the same framerate as the sequence, otherwise ranges will be incorrect in unreal.
+        - Make sure NLA track is not in edit mode, otherwise export fails.
 
     :param list rig_objects: A list of rig objects.
     :param object properties: The property group that contains variables that maintain the addon's correct state.
@@ -769,21 +779,40 @@ def create_level_sequence_data(rig_objects, properties):
             if rig_object.send2ue_armature.get_path() == "":
                 print(f"{rig_object.name} does not have an actor path set for its appropriate mode, skipping.")
                 continue
-            if rig_object.animation_data and len(rig_object.animation_data.nla_tracks) > 0:
-                nla_track = rig_object.animation_data.nla_tracks[-1]
-                for strip in nla_track.strips:
-                    if strip.action:
-                        action_name = strip.action.name
-                        anim_asset_name = utilities.get_asset_name(action_name, properties)
-                        anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
-                        anim_tracks.append({
-                            "type" : "Animation",
-                            "frame_range" : (strip.frame_start, strip.frame_end),
-                            "anim_asset_path" : anim_asset_path,
-                            "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
-                            "actor_path" : rig_object.send2ue_armature.get_path(),
-                            "actor_category" : rig_object.send2ue_armature.actor_category,
-                        })
+            num_tracks = len(rig_object.animation_data.nla_tracks)
+            if rig_object.animation_data and num_tracks > 0:
+                nla_track = None
+                solo_tracks = [i for i in rig_object.animation_data.nla_tracks if i.is_solo]
+                if len(solo_tracks) > 0:
+                    nla_track = solo_tracks[0]
+                else:
+                    for i in range(num_tracks):
+                        nla_track = rig_object.animation_data.nla_tracks[-(i+1)]
+                        if not nla_track.mute:
+                            break
+                if nla_track:
+                    for strip in nla_track.strips:
+                        if strip.action:
+                            action_name = strip.action.name
+                            anim_asset_name = utilities.get_asset_name(action_name, properties)
+                            
+                            # We assume linked actions are already exported using their rig object's anim asset path
+                            # Otherwise, we save all sequence specific actions to global path found in the scene property
+                            if strip.action.library is not None:
+                                anim_asset_folder = rig_object.send2ue_armature.anim_asset_path.strip()
+                                if anim_asset_folder == "":
+                                    raise Exception(f"{rig_object.name} must have a defined anim_asset_path if linked actions are used in its NLA track.")
+                                anim_asset_path = f'{anim_asset_folder}{anim_asset_name}'
+                            else:
+                                anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
+                            anim_tracks.append({
+                                "type" : "Animation",
+                                "frame_range" : (strip.frame_start, strip.frame_end),
+                                "anim_asset_path" : anim_asset_path,
+                                "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
+                                "actor_path" : rig_object.send2ue_armature.get_path(),
+                                "actor_category" : rig_object.send2ue_armature.actor_category,
+                            })
 
 
     sequence_data[asset_id] = {

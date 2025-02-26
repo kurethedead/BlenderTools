@@ -222,8 +222,6 @@ def get_action_names(rig_object, all_actions=True):
     if rig_object:
         if rig_object.animation_data:
             for nla_track in rig_object.animation_data.nla_tracks:
-                if nla_track.is_override_data:
-                    continue # ignore linked tracks, since they aren't deletable
                 
                 # if solo only return the actions in that track
                 if nla_track.is_solo and not all_actions:

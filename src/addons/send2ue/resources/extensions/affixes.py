@@ -48,7 +48,8 @@ def add_affixes():
         actions = utilities.get_actions(rig_object, properties.export_all_actions)
         if rig_object.animation_data:
             if rig_object.animation_data.action:
-                actions.append(rig_object.animation_data.action)
+                if rig_object.animation_data.action.library is None: # ignore linked actions
+                    actions.append(rig_object.animation_data.action)
 
         for action in actions:
             append_affix(action, properties.extensions.affixes.animation_sequence_name_affix)
