@@ -15,6 +15,44 @@ SEQUENCER_ACTOR_CATEGORIES = [
     ("Possessable", "Possessable", "Possessable"),
 ]
 
+SCENE_COMPLETION_MODE = [
+    ("KEEP_STATE", "Keep State", "KEEP_STATE"),
+    ("RESTORE_STATE", "Restore State", "RESTORE_STATE"),
+    ("PROJECT_DEFAULT", "Project Default", "PROJECT_DEFAULT"),
+]
+
+class Send2UeNlaStripProperties(bpy.types.PropertyGroup):
+    force_custom_mode: bpy.props.BoolProperty(
+        name = "Force Custom Mode",
+        default = False
+    )
+    
+    play_rate: bpy.props.FloatProperty(
+        name = "Play Rate",
+        default = 1
+    )
+    
+    reverse: bpy.props.BoolProperty(
+        name = "Reverse",
+        default = False
+    )
+    
+    skip_anim_notifiers: bpy.props.BoolProperty(
+        name = "Skip Anim Notifiers",
+        default = False
+    )
+    
+    slot_name: bpy.props.StringProperty(
+        name = "Slot Name",
+        default = "Default"
+    )
+    
+    completion_mode : bpy.props.EnumProperty(
+        name = "Completion Mode",
+        items = SCENE_COMPLETION_MODE,
+        default = "PROJECT_DEFAULT",
+    )
+
 class Send2UeMeshProperties(bpy.types.PropertyGroup):
     category: bpy.props.EnumProperty(
         name = "Category",
@@ -171,6 +209,32 @@ class Send2UeBonePanel(bpy.types.Panel):
 
         col.prop(prop, "is_observable_section")
 
+class Send2UeNlaStripPanel(bpy.types.Panel):
+    bl_label = "Send2UE Strip"
+    bl_idname = "OBJECT_PT_Send2UE_Strip"
+    bl_space_type = "NLA_EDITOR"
+    bl_region_type = "UI"
+    bl_context = "object"
+    bl_options = {"HIDE_HEADER"}
+    bl_category = "Send2UE"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_nla_strip is not None and context.active_nla_strip.action is not None
+
+    def draw(self, context):
+        prop = context.active_nla_strip.action.send2ue_strip
+        col = self.layout.column()
+        col.label(text="Send2UE Strip")
+
+        col.prop(prop, "force_custom_mode")
+        col.prop(prop, "play_rate")
+        col.prop(prop, "reverse")
+        col.prop(prop, "skip_anim_notifiers")
+        col.prop(prop, "slot_name")
+        col.prop(prop, "completion_mode")
+        col.label(text="Note that these settings are stored on the action, since NlaStrip is not an ID type.")
+
 PROPERTY_CLASSES = [
     Send2UeArmatureProperties,
     Send2UeBoneProperties,
@@ -178,6 +242,8 @@ PROPERTY_CLASSES = [
     Send2UeBonePanel,
     Send2UeMeshProperties,
     Send2UeMeshPanel,
+    Send2UeNlaStripProperties,
+    Send2UeNlaStripPanel,
     #Send2UeObjectProperties,
     #Send2UeObjectPanel
 ]
@@ -188,12 +254,16 @@ def register_metadata_properties():
     bpy.types.Object.send2ue_armature = bpy.props.PointerProperty(type=Send2UeArmatureProperties, override={"LIBRARY_OVERRIDABLE"})
     bpy.types.Object.send2ue_mesh = bpy.props.PointerProperty(type=Send2UeMeshProperties)
     bpy.types.Bone.send2ue_bone = bpy.props.PointerProperty(type=Send2UeBoneProperties)
+    
+    # Note that while incorrect, we can't place this on NlaStrip since it doesn't inherit from ID type.
+    bpy.types.Action.send2ue_strip = bpy.props.PointerProperty(type=Send2UeNlaStripProperties)
     #bpy.types.Object.send2ue_object = bpy.props.PointerProperty(type=Send2UeObjectProperties)
 
 def unregister_metadata_properties():
     del bpy.types.Object.send2ue_armature
     del bpy.types.Object.send2ue_mesh
     del bpy.types.Bone.send2ue_bone
+    del bpy.types.Action.send2ue_strip
     #del bpy.types.Object.send2ue_object
     for cls in PROPERTY_CLASSES:
         bpy.utils.unregister_class(cls)

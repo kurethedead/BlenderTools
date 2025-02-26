@@ -926,6 +926,13 @@ class UnrealImportLevelSequence(Unreal):
         """
         self.asset_data = asset_data
         
+        self.UNREAL_SCENE_COMPLETION_MODE = {
+            "KEEP_STATE" : unreal.MovieSceneCompletionMode.KEEP_STATE, 
+            "RESTORE_STATE" : unreal.MovieSceneCompletionMode.RESTORE_STATE, 
+            "PROJECT_DEFAULT" : unreal.MovieSceneCompletionMode.PROJECT_DEFAULT, 
+        }
+
+        
     # gets frame number in tick space
     def get_frame(self, frame: int, sequence: "unreal.LevelSequence"):
         time_as_frame_time = unreal.FrameTime(unreal.FrameNumber(frame))
@@ -1028,6 +1035,15 @@ class UnrealImportLevelSequence(Unreal):
             anim_section = anim_track.add_section()
             frame_range = track["frame_range"]
             anim_section.set_range(*frame_range)
+            anim_section.params.set_editor_property("force_custom_mode", track["force_custom_mode"])
+            anim_section.params.set_editor_property("play_rate", track["play_rate"])
+            anim_section.params.set_editor_property("reverse", track["reverse"])
+            anim_section.params.set_editor_property("skip_anim_notifiers", track["skip_anim_notifiers"])
+            anim_section.params.set_editor_property("slot_name", track["slot_name"])
+            
+            eval_options = anim_section.get_editor_property("eval_options")
+            eval_options.set_editor_property("completion_mode", self.UNREAL_SCENE_COMPLETION_MODE[track["completion_mode"]])
+            anim_section.set_editor_property("eval_options", eval_options)
 
             # set MovieSceneSkeletalAnimationTrack animation asset
             anim_seq = unreal.load_asset(track["anim_asset_path"])

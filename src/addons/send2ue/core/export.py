@@ -640,7 +640,7 @@ def create_level_sequence_data(rig_objects, properties):
     
     Importer Quirks:
         - Marker Naming
-            - markers in the format F_### will be ignored for marker import, but not for camera shot import
+            - markers with an empty name will be ignored for marker import, but not for camera shot import
         - linked objects must be made fully local, or else:
             - actor/skeletal path properties on object won't be saved
             - NLA tracks/strips can't be editted
@@ -804,6 +804,7 @@ def create_level_sequence_data(rig_objects, properties):
                                 anim_asset_path = f'{anim_asset_folder}{anim_asset_name}'
                             else:
                                 anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
+                            strip_prop = strip.action.send2ue_strip
                             anim_tracks.append({
                                 "type" : "Animation",
                                 "frame_range" : (strip.frame_start, strip.frame_end),
@@ -811,6 +812,12 @@ def create_level_sequence_data(rig_objects, properties):
                                 "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
                                 "actor_path" : rig_object.send2ue_armature.get_path(),
                                 "actor_category" : rig_object.send2ue_armature.actor_category,
+                                "force_custom_mode" : strip_prop.force_custom_mode,
+                                "play_rate" : strip_prop.play_rate,
+                                "reverse" : strip_prop.reverse,
+                                "skip_anim_notifiers" : strip_prop.skip_anim_notifiers,
+                                "slot_name" : strip_prop.slot_name,
+                                "completion_mode" : strip_prop.completion_mode,
                             })
 
 
