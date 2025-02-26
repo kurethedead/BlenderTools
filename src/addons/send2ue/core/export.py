@@ -669,9 +669,8 @@ def create_level_sequence_data(rig_objects, properties):
     # get markers used for dialog system stopping points
     markers = []
     for marker in scene.timeline_markers:
-        # Ignore any default named frames (we do this to handle camera cut markers)
-        if marker.name.startswith("F_") and marker.name[2:].isdigit():
-            # keep track of cameras (in case a camera is static without NLA animations)
+        # Ignore any empty names (we do this to handle camera cut markers)
+        if marker.name.strip() == "":
             continue
         markers.append({"name" : marker.name, "frame" : marker.frame})
         
