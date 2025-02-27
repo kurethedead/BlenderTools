@@ -209,6 +209,12 @@ def get_custom_property_fcurve_data(action_name):
                 data[name] = [[(point.co[0] - 1) / frame_rate, point.co[1]] for point in fcurve.keyframe_points]
     return data
 
+# We only want to handle actions that animate bones
+def is_armature_action(action):
+    for fcurve in action.fcurves:
+        if fcurve.data_path.startswith("pose.bones["):
+            return True
+    return False
 
 def get_action_names(rig_object, all_actions=True):
     """
@@ -228,20 +234,23 @@ def get_action_names(rig_object, all_actions=True):
                     action_names = []
                     for strip in nla_track.strips:
                         if strip.action and strip.action.library is None: # ignore linked actions
-                            return [strip.action.name]
+                            if is_armature_action(strip.action): # ignore object animations
+                                return [strip.action.name]
 
                 # get all the action names if the all flag is set
                 if all_actions:
                     for strip in nla_track.strips:
                         if strip.action and strip.action.library is None: # ignore linked actions
-                            action_names.append(strip.action.name)
+                            if is_armature_action(strip.action): # ignore object animations
+                                action_names.append(strip.action.name)
 
                 # otherwise get only the un-muted actions
                 else:
                     if not nla_track.mute:
                         for strip in nla_track.strips:
                             if strip.action and strip.action.library is None: # ignore linked actions
-                                action_names.append(strip.action.name)
+                                if is_armature_action(strip.action): # ignore object animations
+                                    action_names.append(strip.action.name)
     return action_names
 
 

@@ -634,7 +634,42 @@ def get_other_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Imag
                 image_dict[node.label[len(INPUT_PREFIX):]] = node.image
     return image_dict
 
-def create_level_sequence_data(rig_objects, properties):
+def create_transform_track() -> dict[str, list]:
+    return {
+        "location_x" : [],
+        "location_y" : [],
+        "location_z" : [],
+        "rotation_x" : [],
+        "rotation_y" : [],
+        "rotation_z" : [],
+        "scale_x" : [],
+        "scale_y" : [],
+        "scale_z" : [],
+        "hide" : [],
+    }
+
+def read_transform_frames(track : dict[str, list], frame : int, obj : "bpy.types.Object", scene_scale : float, rotation_offset : list, location_offset : list, is_camera : bool = False):
+    mm = mathutils.Matrix.Identity(4)
+    mm[1][1] = -1 # handle left vs right hand space
+    
+    offset_mat = mathutils.Matrix.Translation((-location_offset[0] / (scene_scale * 100), -location_offset[1] / (scene_scale * 100), -location_offset[2] / (scene_scale * 100)))
+    loc, rot, scale = (mm @ obj.matrix_world @ offset_mat @ mm.inverted()).decompose()
+    
+    rot = rot @ mathutils.Euler((-rotation_offset[0], -rotation_offset[1], -rotation_offset[2]), 'XYZ').to_quaternion()
+    hide = not obj.hide_viewport
+    
+    track["location_x"].append((frame, loc[0] * 100 * scene_scale)) # handle unreal-blender unit scale
+    track["location_y"].append((frame, loc[1] * 100 * scene_scale))
+    track["location_z"].append((frame, loc[2] * 100 * scene_scale))
+    track["rotation_x"].append((frame, math.degrees(rot.to_euler()[0]) + 90 if is_camera else -math.degrees(rot.to_euler()[0]))) # handle different camera orientation
+    track["rotation_y"].append((frame, math.degrees(rot.to_euler()[1]) if is_camera else -math.degrees(rot.to_euler()[1])))
+    track["rotation_z"].append((frame, math.degrees(rot.to_euler()[2]) - (90 if is_camera else 0)))
+    track["scale_x"].append((frame, scale[0]))
+    track["scale_y"].append((frame, scale[1]))
+    track["scale_z"].append((frame, scale[2]))
+    track["hide"].append((frame, hide))
+
+def create_level_sequence_data(rig_objects, mesh_objects, properties):
     """
     Collects and creates all the asset data needed for the import process.
     
@@ -647,6 +682,8 @@ def create_level_sequence_data(rig_objects, properties):
         - Note that linked actions are assumed to already by exported using their rig_object's anim_asset_path.
         - Make sure linked animations have the same framerate as the sequence, otherwise ranges will be incorrect in unreal.
         - Make sure NLA track is not in edit mode, otherwise export fails.
+        
+    Note that all NLA tracks are muted during export (each unmuted one at a time), and active actions are pushed to track beforehand.
 
     :param list rig_objects: A list of rig objects.
     :param object properties: The property group that contains variables that maintain the addon's correct state.
@@ -689,7 +726,7 @@ def create_level_sequence_data(rig_objects, properties):
         camera_objs[marker.camera] = (camera_start_frame, camera_end_frame)
         
     # null actions on objects, so only NLA influence is evaluated
-    for obj in bpy.context.view_layer.objects:
+    for obj in rig_objects:
         if obj.animation_data and obj.animation_data.action:
             obj.animation_data.action.use_fake_user = True # TODO: Should we do this?
             obj.animation_data.action = None
@@ -729,53 +766,31 @@ def create_level_sequence_data(rig_objects, properties):
         else:
             pass # TODO: handle static camera
     '''
-        
+    
     # evaluate transform each frame
     #anim_camera_objs = [obj for obj in camera_objs if obj.animation_data is not None]
     #static_camera_objs = [obj for obj in camera_objs if obj.animation_data is None]
     transform_tracks : dict[str, object] = {}
     for camera_obj, frame_range in camera_objs.items():
-        transform_tracks[camera_obj.name] = {
+        transform_tracks[camera_obj.name] = create_transform_track() | {
             "type" : "Camera",
             "frame_range" : frame_range,
-            "location_x" : [],
-            "location_y" : [],
-            "location_z" : [],
-            "rotation_x" : [],
-            "rotation_y" : [],
-            "rotation_z" : [],
-            "scale_x" : [],
-            "scale_y" : [],
-            "scale_z" : [],
-            "hide" : [],
             "fov" : [],
         }
-    for i in range(start_frame, end_frame + 1):
+    for i in range(start_frame, end_frame):
         scene.frame_set(i)
         for camera_obj, frame_range in camera_objs.items():
             track = transform_tracks[camera_obj.name]
-            mm = mathutils.Matrix.Identity(4)
-            mm[1][1] = -1 # handle left vs right hand space
-            loc, rot, scale = (mm @ camera_obj.matrix_world @ mm.inverted()).decompose()
-            hide = camera_obj.hide_viewport
             fov = math.degrees(camera_obj.data.angle)
             
-            track["location_x"].append((i, loc[0] * 100)) # handle unreal-blender unit scale
-            track["location_y"].append((i, loc[1] * 100))
-            track["location_z"].append((i, loc[2] * 100))
-            track["rotation_x"].append((i, math.degrees(rot.to_euler()[0]) + 90)) # handle different camera orientation
-            track["rotation_y"].append((i, math.degrees(rot.to_euler()[1])))
-            track["rotation_z"].append((i, math.degrees(rot.to_euler()[2]) - 90))
-            track["scale_x"].append((i, scale[0]))
-            track["scale_y"].append((i, scale[1]))
-            track["scale_z"].append((i, scale[2]))
-            track["hide"].append((i, hide))
+            read_transform_frames(track, i, camera_obj, properties.sequencer_scene_scale, mathutils.Vector([0,0,0]), mathutils.Vector([0,0,0]), True)
             track["fov"].append((i, fov))
 
     anim_tracks = []
     for rig_object in rig_objects:
+        transform_track_saved = False
         if rig_object:
-            if rig_object.send2ue_armature.get_path() == "":
+            if rig_object.send2ue_armature.actor_prop.get_path() == "":
                 print(f"{rig_object.name} does not have an actor path set for its appropriate mode, skipping.")
                 continue
             num_tracks = len(rig_object.animation_data.nla_tracks)
@@ -791,7 +806,7 @@ def create_level_sequence_data(rig_objects, properties):
                             break
                 if nla_track:
                     for strip in nla_track.strips:
-                        if strip.action:
+                        if strip.action and utilities.is_armature_action(strip.action):
                             action_name = strip.action.name
                             anim_asset_name = utilities.get_asset_name(action_name, properties)
                             
@@ -805,21 +820,51 @@ def create_level_sequence_data(rig_objects, properties):
                             else:
                                 anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
                             strip_prop = strip.action.send2ue_strip
+                            
+                            if not transform_track_saved and rig_object.send2ue_armature.actor_prop.export_transforms:
+                                transform_track_saved = True
+                                utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
+                                transform_track = create_transform_track()
+                                for i in range(start_frame, end_frame):
+                                    bpy.context.scene.frame_set(i)
+                                    read_transform_frames(transform_track, i, rig_object, properties.sequencer_scene_scale, 
+                                                          rig_object.send2ue_armature.actor_prop.rotation_offset,
+                                                          rig_object.send2ue_armature.actor_prop.location_offset)
+                                utilities.set_all_action_mute_values(rig_object, mute=True)
+                            else:
+                                transform_track = None
+                            
                             anim_tracks.append({
                                 "type" : "Animation",
                                 "frame_range" : (strip.frame_start, strip.frame_end),
                                 "anim_asset_path" : anim_asset_path,
                                 "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
-                                "actor_path" : rig_object.send2ue_armature.get_path(),
-                                "actor_category" : rig_object.send2ue_armature.actor_category,
+                                "actor_path" : rig_object.send2ue_armature.actor_prop.get_path(),
+                                "actor_category" : rig_object.send2ue_armature.actor_prop.actor_category,
                                 "force_custom_mode" : strip_prop.force_custom_mode,
                                 "play_rate" : strip_prop.play_rate,
                                 "reverse" : strip_prop.reverse,
                                 "skip_anim_notifiers" : strip_prop.skip_anim_notifiers,
                                 "slot_name" : strip_prop.slot_name,
                                 "completion_mode" : strip_prop.completion_mode,
+                                "transform_track" : transform_track,
                             })
 
+    obj_transform_tracks = {}
+    for i in range(start_frame, end_frame):
+        bpy.context.scene.frame_set(i)
+        for mesh_object in [obj for obj in mesh_objects if obj.send2ue_object.actor_prop.export_transforms]:
+            if mesh_object.name not in obj_transform_tracks:
+                transform_track = create_transform_track() | {
+                    "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
+                    "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
+                }
+                obj_transform_tracks[mesh_object.name] = transform_track
+            utilities.set_all_action_mute_values(mesh_object, mute=False) # un-mute actions since animation export mutes them
+            read_transform_frames(obj_transform_tracks[mesh_object.name], i, mesh_object, properties.sequencer_scene_scale, 
+                                  rig_object.send2ue_object.actor_prop.rotation_offset,
+                                  rig_object.send2ue_armature.actor_prop.location_offset)
+            utilities.set_all_action_mute_values(mesh_object, mute=True)
 
     sequence_data[asset_id] = {
         '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
@@ -833,6 +878,7 @@ def create_level_sequence_data(rig_objects, properties):
         'markers' : markers,
         'tracks' : transform_tracks,
         'anim_tracks' : anim_tracks,
+        'obj_tracks' : obj_transform_tracks,
     }
     #print(str(sequence_data[asset_id]))
     return sequence_data
@@ -868,7 +914,7 @@ def create_asset_data(properties):
     create_texture_data(mesh_objects, mesh_data, properties)
     
     # get level sequence data
-    level_sequence_data = create_level_sequence_data(rig_objects, properties)
+    level_sequence_data = create_level_sequence_data(rig_objects, mesh_objects, properties)
 
     # update the properties with the asset data
     bpy.context.window_manager.send2ue.asset_data.update({**mesh_data, **animation_data, **hair_data, **level_sequence_data})

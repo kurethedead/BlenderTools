@@ -524,6 +524,11 @@ def get_scene_property_class():
             default=True,
             description="Disable only if you know Groom plugin is enabled but still get an error"
         )
+        sequencer_scene_scale : bpy.props.FloatProperty(
+            name = "Sequencer Scene Scale",
+            default = 1,
+            description="Multiplier for location values in transform tracks"
+        )
 
     return Send2UeSceneProperties
 

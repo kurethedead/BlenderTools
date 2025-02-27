@@ -931,6 +931,27 @@ class UnrealImportLevelSequence(Unreal):
             "RESTORE_STATE" : unreal.MovieSceneCompletionMode.RESTORE_STATE, 
             "PROJECT_DEFAULT" : unreal.MovieSceneCompletionMode.PROJECT_DEFAULT, 
         }
+        
+    def add_transform_track(self, track_data : dict[str, list], binding, start_frame, end_frame, add_visibility_track):
+        transform_track = binding.add_track(unreal.MovieScene3DTransformTrack)
+        transform_section = transform_track.add_section()
+        transform_section.set_range(start_frame, end_frame)
+      
+        channel_names = ["location_x", "location_y", "location_z", "rotation_x", "rotation_y", "rotation_z", "scale_x", "scale_y", "scale_z"]
+        for i, channel_name in enumerate(channel_names):
+            channel = transform_section.get_all_channels()[i]
+            for key in track_data[channel_name]:
+                channel.add_key(time=unreal.FrameNumber(key[0]), new_value=key[1])
+                
+        visibility_track = binding.add_track(unreal.MovieSceneVisibilityTrack)
+        visibility_track.set_property_name_and_path('bHidden', 'bHidden')
+        visibility_section = visibility_track.add_section()
+        visibility_section.set_start_frame_bounded(0)
+        visibility_section.set_end_frame_bounded(0)
+        for key in track_data["hide"]:
+            visibility_section.get_all_channels()[0].add_key(time=unreal.FrameNumber(key[0]), new_value=key[1])
+        
+        return transform_track
 
         
     # gets frame number in tick space
@@ -979,15 +1000,7 @@ class UnrealImportLevelSequence(Unreal):
             camera_component_binding.set_display_name('Camera Component')	
             
             camera_actor.set_actor_label(camera_name)
-            transform_track = camera_binding.add_track(unreal.MovieScene3DTransformTrack)
-            transform_section = transform_track.add_section()
-            transform_section.set_range(start_frame, end_frame)
-      
-            channel_names = ["location_x", "location_y", "location_z", "rotation_x", "rotation_y", "rotation_z", "scale_x", "scale_y", "scale_z"]
-            for i, channel_name in enumerate(channel_names):
-                channel = transform_section.get_all_channels()[i]
-                for key in track[channel_name]:
-                    channel.add_key(time=unreal.FrameNumber(key[0]), new_value=key[1])
+            self.add_transform_track(track, camera_binding, start_frame, end_frame, False)
                     
             # Add FOV
             fov_track = camera_component_binding.add_track(unreal.MovieSceneFloatTrack)
@@ -1015,7 +1028,7 @@ class UnrealImportLevelSequence(Unreal):
             actor_path = track["actor_path"]
             is_spawnable = track["actor_category"] == "Spawnable"
             #level_actor = actor_system.get_actor_reference(unreal_actor_name)
-            print(actor_path)
+            
             #level_actor = unreal.find_object(level_editor.get_current_level(), unreal_actor_name)
             # Create a cine camera actor
             
@@ -1048,6 +1061,35 @@ class UnrealImportLevelSequence(Unreal):
             # set MovieSceneSkeletalAnimationTrack animation asset
             anim_seq = unreal.load_asset(track["anim_asset_path"])
             anim_section.params.animation = anim_seq
+            
+            if track["transform_track"]:
+                self.add_transform_track(track["transform_track"], actor_binding, start_frame, end_frame, True)
+             
+            if is_spawnable:   
+                ls_system.convert_to_spawnable(actor_binding)
+                
+        transform_tracks = {} # (actor_path, is_spawnable) : anim track
+        for name, track in self.asset_data["obj_tracks"].items():
+            actor_path = track["actor_path"]
+            is_spawnable = track["actor_category"] == "Spawnable"
+            #level_actor = actor_system.get_actor_reference(unreal_actor_name)
+            
+            #level_actor = unreal.find_object(level_editor.get_current_level(), unreal_actor_name)
+            # Create a cine camera actor
+            
+            transform_track = transform_tracks.get((actor_path, is_spawnable))
+            if transform_track is None:
+                if is_spawnable:
+                    actor_asset = unreal.load_asset(actor_path)
+                    level_actor = unreal.EditorLevelLibrary().spawn_actor_from_object(actor_asset, unreal.Vector(0,0,0), unreal.Rotator(0,0,0))
+                else:
+                    level_actor = unreal.find_object(level_editor.get_current_level(), actor_path)
+
+                # Add a spawnable using that cine camera actor
+                actor_binding = level_sequence.add_possessable(level_actor)
+            
+            level_actor.set_actor_label(name)
+            self.add_transform_track(track, actor_binding, start_frame, end_frame, True)
              
             if is_spawnable:   
                 ls_system.convert_to_spawnable(actor_binding)

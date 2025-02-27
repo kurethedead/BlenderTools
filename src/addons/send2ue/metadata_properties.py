@@ -44,7 +44,7 @@ class Send2UeNlaStripProperties(bpy.types.PropertyGroup):
     
     slot_name: bpy.props.StringProperty(
         name = "Slot Name",
-        default = "Default"
+        default = "DefaultSlot"
     )
     
     completion_mode : bpy.props.EnumProperty(
@@ -52,6 +52,59 @@ class Send2UeNlaStripProperties(bpy.types.PropertyGroup):
         items = SCENE_COMPLETION_MODE,
         default = "PROJECT_DEFAULT",
     )
+
+class Send2UeSequencerActorProperties(bpy.types.PropertyGroup):
+
+    export_transforms: bpy.props.BoolProperty(
+        name = "Export Transform Frames",
+        override={"LIBRARY_OVERRIDABLE"},
+    )
+
+    actor_category: bpy.props.EnumProperty(
+        name = "Sequencer Category",
+        items = SEQUENCER_ACTOR_CATEGORIES,
+        override={"LIBRARY_OVERRIDABLE"},
+    )
+    
+    actor_asset_path: bpy.props.StringProperty(
+        name = "Actor Path",
+        override={"LIBRARY_OVERRIDABLE"},
+    )
+    
+    actor_name: bpy.props.StringProperty(
+        name = "Actor Name",
+        override={"LIBRARY_OVERRIDABLE"},
+    )
+    
+    rotation_offset: bpy.props.FloatVectorProperty(
+        name = "Rotation Offset",
+        description = "Used if actor has a mesh component that is rotated from the root scene component",
+        subtype = "EULER",
+    )
+    location_offset: bpy.props.FloatVectorProperty(
+        name = "Location Offset",
+        description = "Used if actor has a mesh component that is translated from the root scene component. This is in unreal units",
+    )
+    
+    def get_path(self):
+        if self.actor_category == "Spawnable":
+            return self.actor_asset_path
+        else:
+            return self.actor_name
+    
+    def draw(self, layout):
+        layout.prop(self, "export_transforms")
+        layout.prop(self, "location_offset")
+        layout.prop(self, "rotation_offset")
+        layout.prop(self, "actor_category")
+        if self.actor_category == "Spawnable":
+            layout.prop(self, "actor_asset_path")
+        else:
+            layout.prop(self, "actor_name")
+
+class Send2UeObjectProperties(bpy.types.PropertyGroup):
+    actor_prop: bpy.props.PointerProperty(type = Send2UeSequencerActorProperties, override={"LIBRARY_OVERRIDABLE"})
+
 
 class Send2UeMeshProperties(bpy.types.PropertyGroup):
     category: bpy.props.EnumProperty(
@@ -79,27 +132,7 @@ class Send2UeArmatureProperties(bpy.types.PropertyGroup):
         description = "Unreal path for anim folder for linked actions, which are assumed to be already exported. Must be terminated with a slash"
     )
     
-    actor_category: bpy.props.EnumProperty(
-        name = "Sequencer Category",
-        items = SEQUENCER_ACTOR_CATEGORIES,
-        override={"LIBRARY_OVERRIDABLE"},
-    )
-    
-    actor_asset_path: bpy.props.StringProperty(
-        name = "Actor Path",
-        override={"LIBRARY_OVERRIDABLE"},
-    )
-    
-    actor_name: bpy.props.StringProperty(
-        name = "Actor Name",
-        override={"LIBRARY_OVERRIDABLE"},
-    )
-    
-    def get_path(self):
-        if self.actor_category == "Spawnable":
-            return self.actor_asset_path
-        else:
-            return self.actor_name
+    actor_prop: bpy.props.PointerProperty(type = Send2UeSequencerActorProperties, override={"LIBRARY_OVERRIDABLE"})
 
 class Send2UeBoneProperties(bpy.types.PropertyGroup):
     is_observable_section: bpy.props.BoolProperty(
@@ -112,7 +145,7 @@ def prop_split(layout, data, field, name, **prop_kwargs):
     split.label(text=name)
     split.prop(data, field, text="", **prop_kwargs)
 
-'''    
+
 class Send2UeObjectPanel(bpy.types.Panel):
     bl_label = "Send2UE Object"
     bl_idname = "OBJECT_PT_Send2UE_Object"
@@ -125,15 +158,17 @@ class Send2UeObjectPanel(bpy.types.Panel):
     def poll(cls, context):
         return (
             context.object is not None
-            and isinstance(context.object.data, bpy.types.Object)
+            and not isinstance(context.object.data, bpy.types.Armature)
         )
 
     def draw(self, context):
         obj = context.object
-        prop = obj.data.send2ue_object
+        prop = obj.send2ue_object
+        actor_prop = prop.actor_prop
         col = self.layout.column().box()
-        col.box().label(text="Send2UE Object")   
-'''    
+        col.box().label(text="Send2UE Object")  
+        actor_prop.draw(col) 
+
         
 class Send2UeArmaturePanel(bpy.types.Panel):
     bl_label = "Send2UE Armature"
@@ -153,17 +188,14 @@ class Send2UeArmaturePanel(bpy.types.Panel):
     def draw(self, context):
         obj = context.object
         prop = obj.send2ue_armature
+        actor_prop = prop.actor_prop
         col = self.layout.column().box()
         col.box().label(text="Send2UE Armature")
 
         col.prop(prop, "category")
         col.prop(prop, "skeleton_asset_path")
         col.prop(prop, "anim_asset_path")
-        col.prop(prop, "actor_category")
-        if prop.actor_category == "Spawnable":
-            col.prop(prop, "actor_asset_path")
-        else:
-            col.prop(prop, "actor_name")
+        actor_prop.draw(col)
     
 class Send2UeMeshPanel(bpy.types.Panel):
     bl_label = "Send2UE Mesh"
@@ -236,6 +268,7 @@ class Send2UeNlaStripPanel(bpy.types.Panel):
         col.label(text="Note that these settings are stored on the action, since NlaStrip is not an ID type.")
 
 PROPERTY_CLASSES = [
+    Send2UeSequencerActorProperties,
     Send2UeArmatureProperties,
     Send2UeBoneProperties,
     Send2UeArmaturePanel,
@@ -244,8 +277,8 @@ PROPERTY_CLASSES = [
     Send2UeMeshPanel,
     Send2UeNlaStripProperties,
     Send2UeNlaStripPanel,
-    #Send2UeObjectProperties,
-    #Send2UeObjectPanel
+    Send2UeObjectProperties,
+    Send2UeObjectPanel
 ]
     
 def register_metadata_properties():
@@ -257,13 +290,13 @@ def register_metadata_properties():
     
     # Note that while incorrect, we can't place this on NlaStrip since it doesn't inherit from ID type.
     bpy.types.Action.send2ue_strip = bpy.props.PointerProperty(type=Send2UeNlaStripProperties)
-    #bpy.types.Object.send2ue_object = bpy.props.PointerProperty(type=Send2UeObjectProperties)
+    bpy.types.Object.send2ue_object = bpy.props.PointerProperty(type=Send2UeObjectProperties)
 
 def unregister_metadata_properties():
     del bpy.types.Object.send2ue_armature
     del bpy.types.Object.send2ue_mesh
     del bpy.types.Bone.send2ue_bone
     del bpy.types.Action.send2ue_strip
-    #del bpy.types.Object.send2ue_object
+    del bpy.types.Object.send2ue_object
     for cls in PROPERTY_CLASSES:
         bpy.utils.unregister_class(cls)
