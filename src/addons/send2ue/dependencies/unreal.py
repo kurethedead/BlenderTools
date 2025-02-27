@@ -961,32 +961,14 @@ class UnrealImportLevelSequence(Unreal):
         time_as_tick = unreal.TimeManagementLibrary.transform_time(time_as_frame_time, sequence.get_display_rate(), sequence.get_tick_resolution())
         return time_as_tick.get_editor_property("frame_number")
     
-    def run_import(self):
-        # assign the options object to the import task and import the asset
-        asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
-        actor_system = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    def import_cameras(self, level_sequence, cam_tracks, start_frame, end_frame):
         ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
-        level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
-  
-        # create sequence
-        sequence_name = self.asset_data["sequence_name"]
-        level_sequence = unreal.AssetTools.create_asset(asset_tools, asset_name = sequence_name, 
-            package_path = "/Game/", asset_class = unreal.LevelSequence, factory = unreal.LevelSequenceFactoryNew())
-        unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(level_sequence)
         
-        # set sequence params
-        start_frame = self.asset_data["start_frame"]
-        end_frame = self.asset_data["end_frame"]
-        frame_rate = unreal.FrameRate(numerator = self.asset_data["framerate"], denominator = 1)
-        level_sequence.set_display_rate(frame_rate)
-        level_sequence.set_playback_start(start_frame)
-        level_sequence.set_playback_end(end_frame)
-        
-        # Add a camera cut track for this camera
+         # Add a camera cut track for this camera
         camera_cut_track = level_sequence.add_track(unreal.MovieSceneCameraCutTrack)
   
         # add transform sections
-        for camera_name, track in self.asset_data["tracks"].items():
+        for camera_name, track in cam_tracks.items():
             # Create a cine camera actor
             camera_actor = unreal.EditorLevelLibrary().spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(0,0,0), unreal.Rotator(0,0,0))
         
@@ -1021,10 +1003,13 @@ class UnrealImportLevelSequence(Unreal):
             camera_cut_section.set_editor_property("CameraBindingID", camera_binding_id)
             
             ls_system.convert_to_spawnable(camera_binding)
+            
+    def import_anims(self, level_sequence, anim_track_data, start_frame, end_frame):
+        ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
+        level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
         
-        # add anim sections
         anim_tracks = {} # (actor_path, is_spawnable) : anim track
-        for track in self.asset_data["anim_tracks"]:
+        for track in anim_track_data:
             actor_path = track["actor_path"]
             is_spawnable = track["actor_category"] == "Spawnable"
             #level_actor = actor_system.get_actor_reference(unreal_actor_name)
@@ -1068,8 +1053,12 @@ class UnrealImportLevelSequence(Unreal):
             if is_spawnable:   
                 ls_system.convert_to_spawnable(actor_binding)
                 
+    def import_objects(self, level_sequence, obj_tracks, start_frame, end_frame):
+        ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
+        level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+        
         transform_tracks = {} # (actor_path, is_spawnable) : anim track
-        for name, track in self.asset_data["obj_tracks"].items():
+        for name, track in obj_tracks.items():
             actor_path = track["actor_path"]
             is_spawnable = track["actor_category"] == "Spawnable"
             #level_actor = actor_system.get_actor_reference(unreal_actor_name)
@@ -1093,13 +1082,40 @@ class UnrealImportLevelSequence(Unreal):
              
             if is_spawnable:   
                 ls_system.convert_to_spawnable(actor_binding)
+    
+    def run_import(self):
+        # assign the options object to the import task and import the asset
+        asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
+        actor_system = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+        ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
+        level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+  
+        # create sequence
+        sequence_name = self.asset_data["sequence_name"]
+        level_sequence = unreal.AssetTools.create_asset(asset_tools, asset_name = sequence_name, 
+            package_path = "/Game/", asset_class = unreal.LevelSequence, factory = unreal.LevelSequenceFactoryNew())
+        unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(level_sequence)
+        
+        # set sequence params
+        start_frame = self.asset_data["start_frame"]
+        end_frame = self.asset_data["end_frame"]
+        frame_rate = unreal.FrameRate(numerator = self.asset_data["framerate"], denominator = 1)
+        level_sequence.set_display_rate(frame_rate)
+        level_sequence.set_playback_start(start_frame)
+        level_sequence.set_playback_end(end_frame)
+        
+        self.import_cameras(level_sequence, self.asset_data["cam_tracks"], start_frame, end_frame)
+        
+        # add anim sections
+        self.import_anims(level_sequence, self.asset_data["anim_tracks"], start_frame, end_frame)
+        
+        self.import_objects(level_sequence, self.asset_data["obj_tracks"], start_frame, end_frame)
             
         # add marked frames
         for marker in self.asset_data["markers"]:
             marked_frame = unreal.MovieSceneMarkedFrame(self.get_frame(marker["frame"], level_sequence), marker["name"], True)
             marked_frame_index = level_sequence.add_marked_frame(marked_frame)
             
-    
         '''
         # Add a current focal length track to the cine camera component
         camera_component = actor.get_cine_camera_component()
@@ -1110,77 +1126,8 @@ class UnrealImportLevelSequence(Unreal):
         focal_length_section = focal_length_track.add_section()
         focal_length_section.set_start_frame_bounded(0)
         focal_length_section.set_end_frame_bounded(0)
-        
-        # open sequence
-        level_sequence = unreal.load_asset(self._asset_path)
-        unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(level_sequence)
-  
-        # create sequence
-        level_sequence = unreal.AssetTools.create_asset(asset_tools, asset_name = "LevelSequenceName", 
-            package_path = "/Game/", asset_class = unreal.LevelSequence, factory = unreal.LevelSequenceFactoryNew())
-  
-        # focus sequence
-        sub_sequence_track = level_sequence.find_tracks_by_type(unreal.MovieSceneSubTrack)[0]
-        sub_sequence_section = sub_sequence_track.get_sections()[0]
-        unreal.LevelSequenceEditorBlueprintLibrary.focus_level_sequence(sub_sequence_section)
-  
-        # set framerate
-        frame_rate = unreal.FrameRate(numerator = 60, denominator = 1)
-        level_sequence.set_display_rate(frame_rate)
-        
-        # set start/end
-        level_sequence.set_playback_start(20)
-        level_sequence.set_playback_end(200)
-  
-        # Add selected actors to current level sequence as possessables
-        actors = actor_system.get_selected_level_actors()
-        bindings = ls_system.add_actors(actors)
-        ls_system.convert_to_spawnable(binding) # optional: convert to spawnable
-  
-        # add camera with track
-        camera = ls_system.create_camera(spawnable = True)
-  
-        # Use the binding to add tracks into sequencer - specified by track type
-        transform_track = actor_binding.add_track(unreal.MovieScene3DTransformTrack)
-        anim_track = actor_binding.add_track(unreal.MovieSceneSkeletalAnimationTrack)
-  
-        transform_section = transform_track.add_section()
-        anim_section = anim_track.add_section()
-
-        start_frame = level_sequence.get_playback_start()
-        end_frame = level_sequence.get_playback_end()
-
-        transform_section.set_range(start_frame, end_frame)
-        anim_section.set_range(start_frame, end_frame)
-
-        # set MovieSceneSkeletalAnimationTrack animation asset
-        anim_seq = unreal.load_asset("/Game/Mannequin/Animations/ThirdPersonWalk")
-        anim_section.params.animation = anim_seq
-  
-        # add frame
-        tx_channel = transform_section.get_all_channelsget_all_channels()[0]
-        tx_channel.add_key(time=unreal.FrameNumber(10), new_value=50.0)
-  
-        # marked frames
-        marked_frame_index = level_sequence.add_marked_frame(35)
-        level_sequence_delete_marked_frame(marked_frame_index)
-        
-        marked_frame = level_sequence.get_marked_frames()[marked_frame_index]
-        marked_frame.set_editor_property("is_determinism_fence", True)
-        marked_frame.set_editor_property("label", "SomeLabel")
-        
-        level_sequence.get_marked_frames()
-        
-        # visibility
-        visibility_track = actor_binding.add_track(unreal.MovieSceneVisibilityTrack)
-        visibility_track.set_property_name_and_path('bHidden', 'bHidden')
-        visibility_section = visibility_track.add_section()
-        visibility_section.set_start_frame_seconds(0)
-        visibility_section.set_end_frame_seconds(length_seconds)
-        
         '''
         unreal.LevelSequenceEditorBlueprintLibrary.refresh_current_level_sequence()
-        #print(f"Importing level sequence to {self._asset_path}")
         return []
         
 class UnrealImportSequence(Unreal):

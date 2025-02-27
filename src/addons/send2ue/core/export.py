@@ -669,6 +669,131 @@ def read_transform_frames(track : dict[str, list], frame : int, obj : "bpy.types
     track["scale_z"].append((frame, scale[2]))
     track["hide"].append((frame, hide))
 
+def create_level_sequence_data_cameras(scene, properties, start_frame, end_frame) -> dict[str,dict[str, list]]:
+    camera_objs : dict [bpy.types.Object, tuple[float, float]] = {} # camera object to frame range
+    camera_markers = [m for m in scene.timeline_markers if m.camera is not None]
+    for i, marker in enumerate(camera_markers):
+        if i == 0:
+            camera_start_frame = start_frame
+        else:
+            camera_start_frame = camera_markers[i].frame
+        
+        if i == len(camera_markers) - 1:
+            camera_end_frame = end_frame
+        else:
+            camera_end_frame = camera_markers[i + 1].frame
+        camera_objs[marker.camera] = (camera_start_frame, camera_end_frame)
+    
+    # evaluate transform each frame
+    #anim_camera_objs = [obj for obj in camera_objs if obj.animation_data is not None]
+    #static_camera_objs = [obj for obj in camera_objs if obj.animation_data is None]
+    transform_tracks : dict[str, object] = {}
+    for camera_obj, frame_range in camera_objs.items():
+        transform_tracks[camera_obj.name] = create_transform_track() | {
+            "frame_range" : frame_range,
+            "fov" : [],
+            
+        }
+    for i in range(start_frame, end_frame):
+        scene.frame_set(i)
+        for camera_obj, frame_range in camera_objs.items():
+            track = transform_tracks[camera_obj.name]
+            fov = math.degrees(camera_obj.data.angle)
+            
+            read_transform_frames(track, i, camera_obj, properties.sequencer_scene_scale, mathutils.Vector([0,0,0]), mathutils.Vector([0,0,0]), True)
+            track["fov"].append((i, fov))
+    
+    return transform_tracks
+
+def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame, end_frame) -> list[dict]:
+    # null actions on objects, so only NLA influence is evaluated
+    for obj in rig_objects:
+        if obj.animation_data and obj.animation_data.action:
+            obj.animation_data.action.use_fake_user = True # TODO: Should we do this?
+            obj.animation_data.action = None
+
+    anim_tracks = []
+    for rig_object in [obj for obj in rig_objects if obj]:
+        transform_track_saved = False
+        if rig_object.send2ue_armature.actor_prop.get_path() == "":
+            print(f"{rig_object.name} does not have an actor path set for its appropriate mode, skipping.")
+            continue
+        num_tracks = len(rig_object.animation_data.nla_tracks)
+        if rig_object.animation_data and num_tracks > 0:
+            nla_track = None
+            solo_tracks = [i for i in rig_object.animation_data.nla_tracks if i.is_solo]
+            if len(solo_tracks) > 0:
+                nla_track = solo_tracks[0]
+            else:
+                for i in range(num_tracks):
+                    nla_track = rig_object.animation_data.nla_tracks[-(i+1)]
+                    if not nla_track.mute:
+                        break
+            if nla_track:
+                for strip in nla_track.strips:
+                    if strip.action and utilities.is_armature_action(strip.action):
+                        action_name = strip.action.name
+                        anim_asset_name = utilities.get_asset_name(action_name, properties)
+                        
+                        # We assume linked actions are already exported using their rig object's anim asset path
+                        # Otherwise, we save all sequence specific actions to global path found in the scene property
+                        if strip.action.library is not None:
+                            anim_asset_folder = rig_object.send2ue_armature.anim_asset_path.strip()
+                            if anim_asset_folder == "":
+                                raise Exception(f"{rig_object.name} must have a defined anim_asset_path if linked actions are used in its NLA track.")
+                            anim_asset_path = f'{anim_asset_folder}{anim_asset_name}'
+                        else:
+                            anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
+                        strip_prop = strip.action.send2ue_strip
+                        
+                        if not transform_track_saved and rig_object.send2ue_armature.actor_prop.export_transforms:
+                            transform_track_saved = True
+                            utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
+                            transform_track = create_transform_track()
+                            for i in range(start_frame, end_frame):
+                                bpy.context.scene.frame_set(i)
+                                read_transform_frames(transform_track, i, rig_object, properties.sequencer_scene_scale, 
+                                                      rig_object.send2ue_armature.actor_prop.rotation_offset,
+                                                      rig_object.send2ue_armature.actor_prop.location_offset)
+                            utilities.set_all_action_mute_values(rig_object, mute=True)
+                        else:
+                            transform_track = None
+                        
+                        anim_tracks.append({
+                            "type" : "Animation",
+                            "frame_range" : (strip.frame_start, strip.frame_end),
+                            "anim_asset_path" : anim_asset_path,
+                            "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
+                            "actor_path" : rig_object.send2ue_armature.actor_prop.get_path(),
+                            "actor_category" : rig_object.send2ue_armature.actor_prop.actor_category,
+                            "force_custom_mode" : strip_prop.force_custom_mode,
+                            "play_rate" : strip_prop.play_rate,
+                            "reverse" : strip_prop.reverse,
+                            "skip_anim_notifiers" : strip_prop.skip_anim_notifiers,
+                            "slot_name" : strip_prop.slot_name,
+                            "completion_mode" : strip_prop.completion_mode,
+                            "transform_track" : transform_track,
+                        })
+    return anim_tracks
+
+def create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame) -> dict[str,dict[str, list]]:
+    obj_transform_tracks = {}
+    for i in range(start_frame, end_frame):
+        scene.frame_set(i)
+        for mesh_object in [obj for obj in mesh_objects if obj.send2ue_object.actor_prop.export_transforms]:
+            if mesh_object.name not in obj_transform_tracks:
+                transform_track = create_transform_track() | {
+                    "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
+                    "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
+                }
+                obj_transform_tracks[mesh_object.name] = transform_track
+            utilities.set_all_action_mute_values(mesh_object, mute=False) # un-mute actions since animation export mutes them
+            read_transform_frames(obj_transform_tracks[mesh_object.name], i, mesh_object, properties.sequencer_scene_scale, 
+                                  mesh_object.send2ue_object.actor_prop.rotation_offset,
+                                  mesh_object.send2ue_object.actor_prop.location_offset)
+            utilities.set_all_action_mute_values(mesh_object, mute=True)
+    return obj_transform_tracks
+
 def create_level_sequence_data(rig_objects, mesh_objects, properties):
     """
     Collects and creates all the asset data needed for the import process.
@@ -711,160 +836,14 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
             continue
         markers.append({"name" : marker.name, "frame" : marker.frame})
         
-    camera_objs : dict [bpy.types.Object, tuple[float, float]] = {} # camera object to frame range
-    camera_markers = [m for m in scene.timeline_markers if m.camera is not None]
-    for i, marker in enumerate(camera_markers):
-        if i == 0:
-            camera_start_frame = start_frame
-        else:
-            camera_start_frame = camera_markers[i].frame
-        
-        if i == len(camera_markers) - 1:
-            camera_end_frame = end_frame
-        else:
-            camera_end_frame = camera_markers[i + 1].frame
-        camera_objs[marker.camera] = (camera_start_frame, camera_end_frame)
-        
-    # null actions on objects, so only NLA influence is evaluated
-    for obj in rig_objects:
-        if obj.animation_data and obj.animation_data.action:
-            obj.animation_data.action.use_fake_user = True # TODO: Should we do this?
-            obj.animation_data.action = None
-        
-    # get tracks (actually, dont do this?)
-    '''
-    tracks = []
-    for camera_obj in camera_objs:
-        animation_data = camera_obj.animation_data
-        if animation_data:
-            for track in animation_data.nla_tracks: # TODO: just get last one?
-                for strip in track.strips:
-                    strip.action
-                    strip.action_frame_end
-                    strip.action_frame_start
-                    strip.blend_in
-                    strip.blend_out
-                    if strip.action:
-                        location_x = strip.action.fcurves.find("location", index = 0)
-                        location_y = strip.action.fcurves.find("location", index = 1)
-                        location_z = strip.action.fcurves.find("location", index = 2)
-                        if camera_obj.rotation_mode == "QUATERNION":
-                            break
-                        elif camera_obj.rotation_mode == "AXIS_ANGLE":
-                            break
-                        else:
-                            rotation_x = strip.action.fcurves.find("rotation_euler", index = 0)
-                            rotation_y = strip.action.fcurves.find("rotation_euler", index = 1)
-                            rotation_z = strip.action.fcurves.find("rotation_euler", index = 2)
-                        scale_x = strip.action.fcurves.find("scale", index = 0)
-                        scale_y = strip.action.fcurves.find("scale", index = 1)
-                        scale_z = strip.action.fcurves.find("scale", index = 2)
-                        visibility = strip.action.fcurves.find("hide_viewport", index = 2)
-                        for fcurve in strip.action:
-                            for keyframe in fcurve.keyframe_points:
-                                frame, value = keyframe.co[:]
-        else:
-            pass # TODO: handle static camera
-    '''
+    # get camera tracks
+    cam_tracks = create_level_sequence_data_cameras(scene, properties, start_frame, end_frame)
     
-    # evaluate transform each frame
-    #anim_camera_objs = [obj for obj in camera_objs if obj.animation_data is not None]
-    #static_camera_objs = [obj for obj in camera_objs if obj.animation_data is None]
-    transform_tracks : dict[str, object] = {}
-    for camera_obj, frame_range in camera_objs.items():
-        transform_tracks[camera_obj.name] = create_transform_track() | {
-            "type" : "Camera",
-            "frame_range" : frame_range,
-            "fov" : [],
-        }
-    for i in range(start_frame, end_frame):
-        scene.frame_set(i)
-        for camera_obj, frame_range in camera_objs.items():
-            track = transform_tracks[camera_obj.name]
-            fov = math.degrees(camera_obj.data.angle)
-            
-            read_transform_frames(track, i, camera_obj, properties.sequencer_scene_scale, mathutils.Vector([0,0,0]), mathutils.Vector([0,0,0]), True)
-            track["fov"].append((i, fov))
+    # get armature animation tracks
+    anim_tracks = create_level_sequence_data_anims(scene, rig_objects, properties, start_frame, end_frame)
 
-    anim_tracks = []
-    for rig_object in rig_objects:
-        transform_track_saved = False
-        if rig_object:
-            if rig_object.send2ue_armature.actor_prop.get_path() == "":
-                print(f"{rig_object.name} does not have an actor path set for its appropriate mode, skipping.")
-                continue
-            num_tracks = len(rig_object.animation_data.nla_tracks)
-            if rig_object.animation_data and num_tracks > 0:
-                nla_track = None
-                solo_tracks = [i for i in rig_object.animation_data.nla_tracks if i.is_solo]
-                if len(solo_tracks) > 0:
-                    nla_track = solo_tracks[0]
-                else:
-                    for i in range(num_tracks):
-                        nla_track = rig_object.animation_data.nla_tracks[-(i+1)]
-                        if not nla_track.mute:
-                            break
-                if nla_track:
-                    for strip in nla_track.strips:
-                        if strip.action and utilities.is_armature_action(strip.action):
-                            action_name = strip.action.name
-                            anim_asset_name = utilities.get_asset_name(action_name, properties)
-                            
-                            # We assume linked actions are already exported using their rig object's anim asset path
-                            # Otherwise, we save all sequence specific actions to global path found in the scene property
-                            if strip.action.library is not None:
-                                anim_asset_folder = rig_object.send2ue_armature.anim_asset_path.strip()
-                                if anim_asset_folder == "":
-                                    raise Exception(f"{rig_object.name} must have a defined anim_asset_path if linked actions are used in its NLA track.")
-                                anim_asset_path = f'{anim_asset_folder}{anim_asset_name}'
-                            else:
-                                anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
-                            strip_prop = strip.action.send2ue_strip
-                            
-                            if not transform_track_saved and rig_object.send2ue_armature.actor_prop.export_transforms:
-                                transform_track_saved = True
-                                utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
-                                transform_track = create_transform_track()
-                                for i in range(start_frame, end_frame):
-                                    bpy.context.scene.frame_set(i)
-                                    read_transform_frames(transform_track, i, rig_object, properties.sequencer_scene_scale, 
-                                                          rig_object.send2ue_armature.actor_prop.rotation_offset,
-                                                          rig_object.send2ue_armature.actor_prop.location_offset)
-                                utilities.set_all_action_mute_values(rig_object, mute=True)
-                            else:
-                                transform_track = None
-                            
-                            anim_tracks.append({
-                                "type" : "Animation",
-                                "frame_range" : (strip.frame_start, strip.frame_end),
-                                "anim_asset_path" : anim_asset_path,
-                                "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
-                                "actor_path" : rig_object.send2ue_armature.actor_prop.get_path(),
-                                "actor_category" : rig_object.send2ue_armature.actor_prop.actor_category,
-                                "force_custom_mode" : strip_prop.force_custom_mode,
-                                "play_rate" : strip_prop.play_rate,
-                                "reverse" : strip_prop.reverse,
-                                "skip_anim_notifiers" : strip_prop.skip_anim_notifiers,
-                                "slot_name" : strip_prop.slot_name,
-                                "completion_mode" : strip_prop.completion_mode,
-                                "transform_track" : transform_track,
-                            })
-
-    obj_transform_tracks = {}
-    for i in range(start_frame, end_frame):
-        bpy.context.scene.frame_set(i)
-        for mesh_object in [obj for obj in mesh_objects if obj.send2ue_object.actor_prop.export_transforms]:
-            if mesh_object.name not in obj_transform_tracks:
-                transform_track = create_transform_track() | {
-                    "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
-                    "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
-                }
-                obj_transform_tracks[mesh_object.name] = transform_track
-            utilities.set_all_action_mute_values(mesh_object, mute=False) # un-mute actions since animation export mutes them
-            read_transform_frames(obj_transform_tracks[mesh_object.name], i, mesh_object, properties.sequencer_scene_scale, 
-                                  rig_object.send2ue_object.actor_prop.rotation_offset,
-                                  rig_object.send2ue_armature.actor_prop.location_offset)
-            utilities.set_all_action_mute_values(mesh_object, mute=True)
+    # get object animation tracks
+    obj_transform_tracks = create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame)
 
     sequence_data[asset_id] = {
         '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
@@ -876,7 +855,7 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
         'end_frame': end_frame,
         'framerate': framerate,
         'markers' : markers,
-        'tracks' : transform_tracks,
+        'cam_tracks' : cam_tracks,
         'anim_tracks' : anim_tracks,
         'obj_tracks' : obj_transform_tracks,
     }

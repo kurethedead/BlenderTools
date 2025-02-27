@@ -69,11 +69,13 @@ class Send2UeSequencerActorProperties(bpy.types.PropertyGroup):
     actor_asset_path: bpy.props.StringProperty(
         name = "Actor Path",
         override={"LIBRARY_OVERRIDABLE"},
+        description="Can be found by right clicking an asset and clicking Copy Reference"
     )
     
     actor_name: bpy.props.StringProperty(
         name = "Actor Name",
         override={"LIBRARY_OVERRIDABLE"},
+        description="Can be found by enabling the ID Name tab in the Outliner and searching for an actor in the level"
     )
     
     rotation_offset: bpy.props.FloatVectorProperty(
