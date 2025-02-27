@@ -23,6 +23,7 @@ class Send2UnrealDialog(bpy.types.Panel):
             self.draw_property(properties, layout, 'unreal_animation_folder_path', header_label=True)
             self.draw_property(properties, layout, 'unreal_groom_folder_path', header_label=True)
             self.draw_property(properties, layout, 'unreal_level_sequence_folder_path', header_label=True)
+            self.draw_property(properties, layout, 'unreal_subsequence_asset_path', header_label=True)
             self.draw_property(properties, layout, 'unreal_skeleton_asset_path', header_label=True)
             self.draw_property(properties, layout, 'unreal_physics_asset_path', header_label=True)
 

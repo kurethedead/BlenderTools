@@ -858,6 +858,7 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
         'cam_tracks' : cam_tracks,
         'anim_tracks' : anim_tracks,
         'obj_tracks' : obj_transform_tracks,
+        'subsequence_path' : properties.unreal_subsequence_asset_path,
     }
     #print(str(sequence_data[asset_id]))
     return sequence_data

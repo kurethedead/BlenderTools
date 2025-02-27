@@ -1082,6 +1082,18 @@ class UnrealImportLevelSequence(Unreal):
              
             if is_spawnable:   
                 ls_system.convert_to_spawnable(actor_binding)
+                
+    def add_subsequence(self, level_sequence, asset_path, start_frame, end_frame):
+        if asset_path.strip() != "":
+            subsequence = unreal.load_asset(asset_path)
+            sub_track = level_sequence.add_track(unreal.MovieSceneSubTrack)
+            
+            # add a subsection for this subsequence
+            subsequence_section = sub_track.add_section()
+            subsequence_section.set_sequence(subsequence)
+            subsequence_section.set_end_frame(end_frame)
+            subsequence_section.set_start_frame(start_frame)
+            #subsequence_section.set_shot_display_name(subsequence_asset_name)
     
     def run_import(self):
         # assign the options object to the import task and import the asset
@@ -1115,6 +1127,8 @@ class UnrealImportLevelSequence(Unreal):
         for marker in self.asset_data["markers"]:
             marked_frame = unreal.MovieSceneMarkedFrame(self.get_frame(marker["frame"], level_sequence), marker["name"], True)
             marked_frame_index = level_sequence.add_marked_frame(marked_frame)
+            
+        self.add_subsequence(level_sequence, self.asset_data["subsequence_path"], start_frame, end_frame)
             
         '''
         # Add a current focal length track to the cine camera component

@@ -529,6 +529,10 @@ def get_scene_property_class():
             default = 1,
             description="Multiplier for location values in transform tracks"
         )
+        unreal_subsequence_asset_path : bpy.props.StringProperty(
+            name = "Subsequence Asset (Optional)",
+            description="Sequence exports will add this asset as a subsequence track. Does nothing if empty"
+        )
 
     return Send2UeSceneProperties
 
