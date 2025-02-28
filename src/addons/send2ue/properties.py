@@ -533,6 +533,10 @@ def get_scene_property_class():
             name = "Subsequence Asset (Optional)",
             description="Sequence exports will add this asset as a subsequence track. Does nothing if empty"
         )
+        sequencer_anims_as_events: bpy.props.BoolProperty(
+            name = "Use sequencer events instead of animation sections",
+            description="Sequence exports will use even triggers to play animations instead of using animation sections"
+        )
 
     return Send2UeSceneProperties
 

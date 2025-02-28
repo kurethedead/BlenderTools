@@ -1004,9 +1004,15 @@ class UnrealImportLevelSequence(Unreal):
             
             ls_system.convert_to_spawnable(camera_binding)
             
-    def import_anims(self, level_sequence, anim_track_data, start_frame, end_frame):
+    def import_anims(self, level_sequence, anim_track_data, sequencer_anims_as_events, start_frame, end_frame):
         ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
         level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+        seq_tools = unreal.SequencerTools
+        
+        endpoint = None
+        if sequencer_anims_as_events:
+            function_name = "PlaySlotAnimationAsDynamicMontage"
+            endpoint = seq_tools.create_quick_binding(level_sequence, unreal.AnimInstance.get_default_object(), function_name, True)
         
         anim_tracks = {} # (actor_path, is_spawnable) : anim track
         for track in anim_track_data:
@@ -1027,25 +1033,49 @@ class UnrealImportLevelSequence(Unreal):
 
                 # Add a spawnable using that cine camera actor
                 actor_binding = level_sequence.add_possessable(level_actor)
-                anim_track = actor_binding.add_track(unreal.MovieSceneSkeletalAnimationTrack)
+                anim_track = actor_binding.add_track(unreal.MovieSceneEventTrack if sequencer_anims_as_events else unreal.MovieSceneSkeletalAnimationTrack)
                 anim_tracks[(actor_path, is_spawnable)] = anim_track
                 
-            anim_section = anim_track.add_section()
-            frame_range = track["frame_range"]
-            anim_section.set_range(*frame_range)
-            anim_section.params.set_editor_property("force_custom_mode", track["force_custom_mode"])
-            anim_section.params.set_editor_property("play_rate", track["play_rate"])
-            anim_section.params.set_editor_property("reverse", track["reverse"])
-            anim_section.params.set_editor_property("skip_anim_notifiers", track["skip_anim_notifiers"])
-            anim_section.params.set_editor_property("slot_name", track["slot_name"])
-            
-            eval_options = anim_section.get_editor_property("eval_options")
-            eval_options.set_editor_property("completion_mode", self.UNREAL_SCENE_COMPLETION_MODE[track["completion_mode"]])
-            anim_section.set_editor_property("eval_options", eval_options)
+            if sequencer_anims_as_events:
+                if len(anim_track.get_sections()) > 0:
+                    event_section = anim_track.get_sections()[0]
+                    #frame_range = track["frame_range"]
+                    #event_section.set_range(*frame_range)
+                    event_section.set_start_frame_bounded(0)
+                    event_section.set_end_frame_bounded(0)
+                else:
+                    event_section = anim_track.add_event_trigger_section()
+                    
+                mesh_component = level_actor.get_component_by_class(unreal.SkeletalMeshComponent)
+                if mesh_component:
+                    anim_instance = mesh_component.get_anim_instance()
+                    
+                    frame_range = track["frame_range"]
+                    #function_name = "SetActorScale3D"
+                    #payload = ["(X=0.5,Y=1.000000,Z=1.000000)"]
+                    #function_name = "Montage_Play"
+                    #payload = [track["anim_asset_string"], "1", "DURATION", "0", "true"]
+                    anim_asset_string = f"/Script/Engine.AnimSequence'{track['anim_asset_path']}.{track['anim_asset_name']}'"
+                    payload = [anim_asset_string, track["slot_name"], "0.25", "0.25", "1", "1", "-1", "0"]
+                    scene_event = seq_tools.create_event(level_sequence, event_section, endpoint, payload)
+                    event_section.get_all_channels()[0].add_key(time=unreal.FrameNumber(frame_range[0]), new_value=scene_event)
+            else:
+                anim_section = anim_track.add_section()
+                frame_range = track["frame_range"]
+                anim_section.set_range(*frame_range)
+                anim_section.params.set_editor_property("force_custom_mode", track["force_custom_mode"])
+                anim_section.params.set_editor_property("play_rate", track["play_rate"])
+                anim_section.params.set_editor_property("reverse", track["reverse"])
+                anim_section.params.set_editor_property("skip_anim_notifiers", track["skip_anim_notifiers"])
+                anim_section.params.set_editor_property("slot_name", track["slot_name"])
 
-            # set MovieSceneSkeletalAnimationTrack animation asset
-            anim_seq = unreal.load_asset(track["anim_asset_path"])
-            anim_section.params.animation = anim_seq
+                eval_options = anim_section.get_editor_property("eval_options")
+                eval_options.set_editor_property("completion_mode", self.UNREAL_SCENE_COMPLETION_MODE[track["completion_mode"]])
+                anim_section.set_editor_property("eval_options", eval_options)
+
+                # set MovieSceneSkeletalAnimationTrack animation asset
+                anim_seq = unreal.load_asset(track["anim_asset_path"])
+                anim_section.params.animation = anim_seq
             
             if track["transform_track"]:
                 self.add_transform_track(track["transform_track"], actor_binding, start_frame, end_frame, True)
@@ -1119,7 +1149,7 @@ class UnrealImportLevelSequence(Unreal):
         self.import_cameras(level_sequence, self.asset_data["cam_tracks"], start_frame, end_frame)
         
         # add anim sections
-        self.import_anims(level_sequence, self.asset_data["anim_tracks"], start_frame, end_frame)
+        self.import_anims(level_sequence, self.asset_data["anim_tracks"], self.asset_data["sequencer_anims_as_events"], start_frame, end_frame)
         
         self.import_objects(level_sequence, self.asset_data["obj_tracks"], start_frame, end_frame)
             

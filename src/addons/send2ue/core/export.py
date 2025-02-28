@@ -762,6 +762,7 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                         anim_tracks.append({
                             "type" : "Animation",
                             "frame_range" : (strip.frame_start, strip.frame_end),
+                            "anim_asset_name" : anim_asset_name,
                             "anim_asset_path" : anim_asset_path,
                             "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
                             "actor_path" : rig_object.send2ue_armature.actor_prop.get_path(),
@@ -859,6 +860,7 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
         'anim_tracks' : anim_tracks,
         'obj_tracks' : obj_transform_tracks,
         'subsequence_path' : properties.unreal_subsequence_asset_path,
+        'sequencer_anims_as_events' : properties.sequencer_anims_as_events
     }
     #print(str(sequence_data[asset_id]))
     return sequence_data

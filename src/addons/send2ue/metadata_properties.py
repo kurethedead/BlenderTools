@@ -83,6 +83,7 @@ class Send2UeSequencerActorProperties(bpy.types.PropertyGroup):
         description = "Used if actor has a mesh component that is rotated from the root scene component",
         subtype = "EULER",
     )
+    
     location_offset: bpy.props.FloatVectorProperty(
         name = "Location Offset",
         description = "Used if actor has a mesh component that is translated from the root scene component. This is in unreal units",
