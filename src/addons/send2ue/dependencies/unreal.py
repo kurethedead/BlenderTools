@@ -1011,8 +1011,11 @@ class UnrealImportLevelSequence(Unreal):
         
         endpoint = None
         if sequencer_anims_as_events:
-            function_name = "PlaySlotAnimationAsDynamicMontage"
-            endpoint = seq_tools.create_quick_binding(level_sequence, unreal.AnimInstance.get_default_object(), function_name, True)
+            function_name = "PlayAnim"
+            endpoint = seq_tools.create_quick_binding(level_sequence, unreal.SequencerEventTriggerer.get_default_object(), function_name, True)
+            # payload_names = endpoint.get_editor_property("payload_names")
+            # payload_names[0] = "Actor"
+            # endpoint.set_editor_property("payload_names", payload_names)
         
         anim_tracks = {} # (actor_path, is_spawnable) : anim track
         for track in anim_track_data:
@@ -1030,6 +1033,9 @@ class UnrealImportLevelSequence(Unreal):
                     level_actor = unreal.EditorLevelLibrary().spawn_actor_from_object(actor_asset, unreal.Vector(0,0,0), unreal.Rotator(0,0,0))
                 else:
                     level_actor = unreal.find_object(level_editor.get_current_level(), actor_path)
+                    
+                if not level_actor:
+                    raise RuntimeError("Could not find actor: " + actor_path)
 
                 # Add a spawnable using that cine camera actor
                 actor_binding = level_sequence.add_possessable(level_actor)
@@ -1045,20 +1051,23 @@ class UnrealImportLevelSequence(Unreal):
                     event_section.set_end_frame_bounded(0)
                 else:
                     event_section = anim_track.add_event_trigger_section()
-                    
-                mesh_component = level_actor.get_component_by_class(unreal.SkeletalMeshComponent)
-                if mesh_component:
-                    anim_instance = mesh_component.get_anim_instance()
-                    
-                    frame_range = track["frame_range"]
-                    #function_name = "SetActorScale3D"
-                    #payload = ["(X=0.5,Y=1.000000,Z=1.000000)"]
-                    #function_name = "Montage_Play"
-                    #payload = [track["anim_asset_string"], "1", "DURATION", "0", "true"]
-                    anim_asset_string = f"/Script/Engine.AnimSequence'{track['anim_asset_path']}.{track['anim_asset_name']}'"
-                    payload = [anim_asset_string, track["slot_name"], "0.25", "0.25", "1", "1", "-1", "0"]
-                    scene_event = seq_tools.create_event(level_sequence, event_section, endpoint, payload)
-                    event_section.get_all_channels()[0].add_key(time=unreal.FrameNumber(frame_range[0]), new_value=scene_event)
+                   
+                frame_range = track["frame_range"]
+                #function_name = "SetActorScale3D"
+                #payload = ["(X=0.5,Y=1.000000,Z=1.000000)"]
+                #function_name = "Montage_Play"
+                #payload = [track["anim_asset_string"], "1", "DURATION", "0", "true"]
+                anim_asset_string = f"/Script/Engine.AnimSequence'{track['anim_asset_path']}.{track['anim_asset_name']}'"
+                #payload = [anim_asset_string, track["slot_name"], "0.25", "0.25", "1", "1", "-1", "0"]
+                payload = [anim_asset_string, track["slot_name"]]
+                scene_event = seq_tools.create_event(level_sequence, event_section, endpoint, payload)
+                
+                if not scene_event.get_editor_property("weak_endpoint"):
+                    raise RuntimeError(f"If you want to use events instead of animations, {actor_path} must implement ISequenceEventTriggerer.")
+                
+                # This is the default name of this pin. Hopefully this doesn't change in future versions.
+                scene_event.set_editor_property("bound_object_pin_name", "Default__SequencerEventTriggerer")
+                event_section.get_all_channels()[0].add_key(time=unreal.FrameNumber(frame_range[0]), new_value=scene_event)
             else:
                 anim_section = anim_track.add_section()
                 frame_range = track["frame_range"]
