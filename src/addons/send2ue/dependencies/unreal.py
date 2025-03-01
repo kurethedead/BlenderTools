@@ -1008,10 +1008,11 @@ class UnrealImportLevelSequence(Unreal):
         ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
         level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
         seq_tools = unreal.SequencerTools
+        asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
         
         endpoint = None
         if sequencer_anims_as_events:
-            function_name = "PlayAnim"
+            function_name = "PlayMontage"
             endpoint = seq_tools.create_quick_binding(level_sequence, unreal.SequencerEventTriggerer.get_default_object(), function_name, True)
             # payload_names = endpoint.get_editor_property("payload_names")
             # payload_names[0] = "Actor"
@@ -1051,15 +1052,31 @@ class UnrealImportLevelSequence(Unreal):
                     event_section.set_end_frame_bounded(0)
                 else:
                     event_section = anim_track.add_event_trigger_section()
-                   
+                    
+                # make montage
+                anim_asset_name = track['anim_asset_name']
+                anim_asset_folder = track['anim_asset_folder']
+                anim_seq = unreal.load_asset(f"{anim_asset_folder}{anim_asset_name}")
+                
+                anim_montage_name = f"AM_{anim_asset_name}"
+                anim_montage_path = f"{anim_asset_folder}{anim_montage_name}"
+                anim_montage = unreal.load_asset(anim_montage_path)
+                if not anim_montage:  
+                    montage_factory = unreal.AnimMontageFactory()
+                    montage_factory.set_editor_property("target_skeleton", anim_seq.get_skeleton())
+                    montage_factory.set_editor_property("source_animation", anim_seq)
+                    anim_montage = unreal.AssetTools.create_asset(asset_tools, asset_name = f"AM_{anim_asset_name}", 
+                        package_path = anim_asset_folder, asset_class = unreal.AnimMontage, factory = montage_factory)
+                #anim_montage.set_editor_property("enable_auto_blend_out", False)
+                
                 frame_range = track["frame_range"]
                 #function_name = "SetActorScale3D"
                 #payload = ["(X=0.5,Y=1.000000,Z=1.000000)"]
                 #function_name = "Montage_Play"
                 #payload = [track["anim_asset_string"], "1", "DURATION", "0", "true"]
-                anim_asset_string = f"/Script/Engine.AnimSequence'{track['anim_asset_path']}.{track['anim_asset_name']}'"
+                anim_montage_string = f"/Script/Engine.AnimMontage'{anim_montage_path}.{anim_montage_name}'"
                 #payload = [anim_asset_string, track["slot_name"], "0.25", "0.25", "1", "1", "-1", "0"]
-                payload = [anim_asset_string, track["slot_name"]]
+                payload = [anim_montage_string]
                 scene_event = seq_tools.create_event(level_sequence, event_section, endpoint, payload)
                 
                 if not scene_event.get_editor_property("weak_endpoint"):

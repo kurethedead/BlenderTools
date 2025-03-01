@@ -741,9 +741,8 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                             anim_asset_folder = rig_object.send2ue_armature.anim_asset_path.strip()
                             if anim_asset_folder == "":
                                 raise Exception(f"{rig_object.name} must have a defined anim_asset_path if linked actions are used in its NLA track.")
-                            anim_asset_path = f'{anim_asset_folder}{anim_asset_name}'
                         else:
-                            anim_asset_path = f'{properties.unreal_animation_folder_path}{anim_asset_name}'
+                            anim_asset_folder = f'{properties.unreal_animation_folder_path}'
                         strip_prop = strip.action.send2ue_strip
                         
                         if not transform_track_saved and rig_object.send2ue_armature.actor_prop.export_transforms:
@@ -763,7 +762,7 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                             "type" : "Animation",
                             "frame_range" : (strip.frame_start, strip.frame_end),
                             "anim_asset_name" : anim_asset_name,
-                            "anim_asset_path" : anim_asset_path,
+                            "anim_asset_folder" : anim_asset_folder,
                             "skeleton_asset_path" : rig_object.send2ue_armature.skeleton_asset_path,
                             "actor_path" : rig_object.send2ue_armature.actor_prop.get_path(),
                             "actor_category" : rig_object.send2ue_armature.actor_prop.actor_category,
@@ -808,6 +807,8 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
         - Note that linked actions are assumed to already by exported using their rig_object's anim_asset_path.
         - Make sure linked animations have the same framerate as the sequence, otherwise ranges will be incorrect in unreal.
         - Make sure NLA track is not in edit mode, otherwise export fails.
+        - For animation event mode, montages will be created only if they don't exist.
+            - This allows for manual montage editting without worrying about having data overwritten.
         
     Note that all NLA tracks are muted during export (each unmuted one at a time), and active actions are pushed to track beforehand.
 
