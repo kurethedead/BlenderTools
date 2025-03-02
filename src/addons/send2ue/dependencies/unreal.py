@@ -1043,6 +1043,13 @@ class UnrealImportLevelSequence(Unreal):
                 anim_track = actor_binding.add_track(unreal.MovieSceneEventTrack if sequencer_anims_as_events else unreal.MovieSceneSkeletalAnimationTrack)
                 anim_tracks[(actor_path, is_spawnable)] = anim_track
                 
+            anim_asset_name = track['anim_asset_name']
+            anim_asset_folder = track['anim_asset_folder']
+            anim_asset_path = f"{anim_asset_folder}{anim_asset_name}"
+            anim_seq = unreal.load_asset(anim_asset_path)
+            
+            if not anim_seq:
+                raise RuntimeError("Could not find animation: " + anim_asset_path)
             if sequencer_anims_as_events:
                 if len(anim_track.get_sections()) > 0:
                     event_section = anim_track.get_sections()[0]
@@ -1052,11 +1059,6 @@ class UnrealImportLevelSequence(Unreal):
                     event_section.set_end_frame_bounded(0)
                 else:
                     event_section = anim_track.add_event_trigger_section()
-                    
-                # make montage
-                anim_asset_name = track['anim_asset_name']
-                anim_asset_folder = track['anim_asset_folder']
-                anim_seq = unreal.load_asset(f"{anim_asset_folder}{anim_asset_name}")
                 
                 anim_montage_name = f"AM_{anim_asset_name}"
                 anim_montage_path = f"{anim_asset_folder}{anim_montage_name}"
@@ -1065,7 +1067,7 @@ class UnrealImportLevelSequence(Unreal):
                     montage_factory = unreal.AnimMontageFactory()
                     montage_factory.set_editor_property("target_skeleton", anim_seq.get_skeleton())
                     montage_factory.set_editor_property("source_animation", anim_seq)
-                    anim_montage = unreal.AssetTools.create_asset(asset_tools, asset_name = f"AM_{anim_asset_name}", 
+                    anim_montage = unreal.AssetTools.create_asset(asset_tools, asset_name = anim_montage_name, 
                         package_path = anim_asset_folder, asset_class = unreal.AnimMontage, factory = montage_factory)
                 #anim_montage.set_editor_property("enable_auto_blend_out", False)
                 
@@ -1100,7 +1102,6 @@ class UnrealImportLevelSequence(Unreal):
                 anim_section.set_editor_property("eval_options", eval_options)
 
                 # set MovieSceneSkeletalAnimationTrack animation asset
-                anim_seq = unreal.load_asset(track["anim_asset_path"])
                 anim_section.params.animation = anim_seq
             
             if track["transform_track"]:

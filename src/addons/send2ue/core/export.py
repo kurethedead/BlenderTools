@@ -253,11 +253,12 @@ def export_mesh(asset_id, mesh_object, properties, lod=0):
     if lod == 0:
         extension.run_extension_tasks(ExtensionTasks.POST_MESH_EXPORT.value)
 
-
+# IMPORTANT: This is a QUEUED JOB. Temp track cleanup must be done here and not outside here.
 @utilities.track_progress(message='Exporting animation "{attribute}"...', attribute='file_path')
 def export_animation(asset_id, rig_object, action_name, properties):
     """
     Exports a single action from a rig object to a file.
+    A staging track is used to handle cases where there are multiple strips on a track.
 
     :param str asset_id: The unique id of the asset.
     :param object rig_object: A object of type armature with animation data.
@@ -275,21 +276,35 @@ def export_animation(asset_id, rig_object, action_name, properties):
 
     # select the scene object
     rig_object.select_set(True)
+      
+    # stage action and un-mute track  
+    action = bpy.data.actions[action_name]
+    staging_track = rig_object.animation_data.nla_tracks.new()
+    try:
+        staging_strip = staging_track.strips.new(action_name, 0, action)
+        staging_track.mute = False
 
-    # un-mute the action
-    utilities.set_action_mute_value(rig_object, action_name, False)
+        # un-mute the action
+        #utilities.set_action_mute_value(rig_object, action_name, False)
 
-    # export the action
-    export_file(properties)
+        # export the action
+        export_file(properties)
 
-    # export custom property fcurves
-    export_custom_property_fcurves(action_name, properties)
+        # export custom property fcurves
+        export_custom_property_fcurves(action_name, properties)
 
-    # ensure the rigs are in rest position before setting the mute values
-    utilities.clear_pose(rig_object)
+        # ensure the rigs are in rest position before setting the mute values
+        utilities.clear_pose(rig_object)
 
-    # mute the action
-    utilities.set_action_mute_value(rig_object, action_name, True)
+        # mute the action
+        #utilities.set_action_mute_value(rig_object, action_name, True)
+        
+        staging_track.mute = True
+    
+    finally:
+        # mute staging track and clear
+        # get value again, since it seems to be invalidated when switching some modes
+        rig_object.animation_data.nla_tracks.remove(staging_track)
 
     # run the post animation export extensions
     extension.run_extension_tasks(ExtensionTasks.POST_ANIMATION_EXPORT.value)
@@ -710,7 +725,8 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
     for obj in rig_objects:
         if obj.animation_data and obj.animation_data.action:
             obj.animation_data.action.use_fake_user = True # TODO: Should we do this?
-            obj.animation_data.action = None
+            if not bpy.context.scene.is_nla_tweakmode:
+                obj.animation_data.action = None
 
     anim_tracks = []
     for rig_object in [obj for obj in rig_objects if obj]:
@@ -725,9 +741,15 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
             if len(solo_tracks) > 0:
                 nla_track = solo_tracks[0]
             else:
+                # Note: anim export has muted all tracks at this point, can't query muteness here
                 for i in range(num_tracks):
-                    nla_track = rig_object.animation_data.nla_tracks[-(i+1)]
-                    if not nla_track.mute:
+                    nla_track = rig_object.animation_data.nla_tracks[i]
+                    has_armature_action = False
+                    for strip in nla_track.strips:
+                        if utilities.is_armature_action(strip.action):
+                            has_armature_action = True
+                            break
+                    if has_armature_action:
                         break
             if nla_track:
                 for strip in nla_track.strips:
@@ -809,6 +831,7 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
         - Make sure NLA track is not in edit mode, otherwise export fails.
         - For animation event mode, montages will be created only if they don't exist.
             - This allows for manual montage editting without worrying about having data overwritten.
+        - The topmost NLA track for an armature that has an armature animation is the track that will be exported to the level sequence
         
     Note that all NLA tracks are muted during export (each unmuted one at a time), and active actions are pushed to track beforehand.
 
