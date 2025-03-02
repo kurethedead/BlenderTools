@@ -232,6 +232,13 @@ def get_scene_property_class():
                 "to this location in your open Unreal Project"
             )
         )
+        unreal_level_sequence_asset_name: bpy.props.StringProperty(
+            name="Level Sequence Asset Name (Unreal)",
+            default=r"level_sequence",
+            description=(
+                "This is the level sequence import name"
+            )
+        )
         unreal_skeleton_asset_path: bpy.props.StringProperty(
             name="Skeleton Asset (Unreal)",
             default=r"",

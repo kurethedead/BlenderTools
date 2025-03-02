@@ -844,7 +844,7 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
     sequence_data = {}
     
     # save the import data
-    sequence_name = bpy.path.basename(bpy.context.blend_data.filepath)[:-6] # remove .blend extension
+    sequence_name = f'{properties.unreal_level_sequence_asset_name}'
     asset_name = utilities.get_asset_name(sequence_name, properties)
     #asset_id = utilities.get_asset_id(file_path)
     asset_id = "LevelSequenceID" # since there is only one level sequence per export, this should be okay
