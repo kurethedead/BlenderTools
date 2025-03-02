@@ -795,6 +795,7 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                             "slot_name" : strip_prop.slot_name,
                             "completion_mode" : strip_prop.completion_mode,
                             "transform_track" : transform_track,
+                            "disable_physics" : rig_object.send2ue_armature.actor_prop.disable_physics,
                         })
     return anim_tracks
 
@@ -807,6 +808,7 @@ def create_level_sequence_data_objects(scene, mesh_objects, properties, start_fr
                 transform_track = create_transform_track() | {
                     "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
                     "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
+                    "disable_physics" : mesh_object.send2ue_object.actor_prop.disable_physics,
                 }
                 obj_transform_tracks[mesh_object.name] = transform_track
             utilities.set_all_action_mute_values(mesh_object, mute=False) # un-mute actions since animation export mutes them

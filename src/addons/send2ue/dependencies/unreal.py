@@ -1004,6 +1004,26 @@ class UnrealImportLevelSequence(Unreal):
             
             ls_system.convert_to_spawnable(camera_binding)
             
+    def add_disable_physics(self, level_sequence, actor_path, actor_binding, frame_range):
+        seq_tools = unreal.SequencerTools
+        event_track = actor_binding.add_track(unreal.MovieSceneEventTrack)
+        event_section = event_track.add_event_trigger_section()
+        event_section.set_start_frame_bounded(0)
+        event_section.set_end_frame_bounded(0)
+        
+        endpoint = seq_tools.create_quick_binding(level_sequence, unreal.SequencerEventTriggerer.get_default_object(), "TogglePhysics", False)
+        start_event = seq_tools.create_event(level_sequence, event_section, endpoint, ["false"])
+        end_event = seq_tools.create_event(level_sequence, event_section, endpoint, ["true"])
+        
+        if not start_event.get_editor_property("weak_endpoint"):
+            raise RuntimeError(f"If you want to use disable event, {actor_path} must implement ISequenceEventTriggerer.")
+        
+        # This is the default name of this pin. Hopefully this doesn't change in future versions.
+        start_event.set_editor_property("bound_object_pin_name", "Default__SequencerEventTriggerer")
+        end_event.set_editor_property("bound_object_pin_name", "Default__SequencerEventTriggerer")
+        event_section.get_all_channels()[0].add_key(time=unreal.FrameNumber(frame_range[0]), new_value=start_event)
+        event_section.get_all_channels()[0].add_key(time=unreal.FrameNumber(frame_range[1] - 1), new_value=end_event)
+            
     def import_anims(self, level_sequence, anim_track_data, sequencer_anims_as_events, start_frame, end_frame):
         ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
         level_editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -1028,7 +1048,9 @@ class UnrealImportLevelSequence(Unreal):
             # Create a cine camera actor
             
             anim_track = anim_tracks.get((actor_path, is_spawnable))
+            first_time = False
             if anim_track is None:
+                first_time = True
                 if is_spawnable:
                     actor_asset = unreal.load_asset(actor_path)
                     level_actor = unreal.EditorLevelLibrary().spawn_actor_from_object(actor_asset, unreal.Vector(0,0,0), unreal.Rotator(0,0,0))
@@ -1053,12 +1075,10 @@ class UnrealImportLevelSequence(Unreal):
             if sequencer_anims_as_events:
                 if len(anim_track.get_sections()) > 0:
                     event_section = anim_track.get_sections()[0]
-                    #frame_range = track["frame_range"]
-                    #event_section.set_range(*frame_range)
-                    event_section.set_start_frame_bounded(0)
-                    event_section.set_end_frame_bounded(0)
                 else:
                     event_section = anim_track.add_event_trigger_section()
+                    event_section.set_start_frame_bounded(0)
+                    event_section.set_end_frame_bounded(0)
                 
                 anim_montage_name = f"AM_{anim_asset_name}"
                 anim_montage_path = f"{anim_asset_folder}{anim_montage_name}"
@@ -1104,11 +1124,14 @@ class UnrealImportLevelSequence(Unreal):
                 # set MovieSceneSkeletalAnimationTrack animation asset
                 anim_section.params.animation = anim_seq
             
-            if track["transform_track"]:
-                self.add_transform_track(track["transform_track"], actor_binding, start_frame, end_frame, True)
+            if first_time:
+                if track["transform_track"]:
+                    self.add_transform_track(track["transform_track"], actor_binding, start_frame, end_frame, True)
+                if track["disable_physics"]:
+                    self.add_disable_physics(level_sequence, actor_path, actor_binding, (start_frame, end_frame))
              
-            if is_spawnable:   
-                ls_system.convert_to_spawnable(actor_binding)
+                if is_spawnable:   
+                    ls_system.convert_to_spawnable(actor_binding)
                 
     def import_objects(self, level_sequence, obj_tracks, start_frame, end_frame):
         ls_system = unreal.get_editor_subsystem(unreal.LevelSequenceEditorSubsystem)
@@ -1136,6 +1159,9 @@ class UnrealImportLevelSequence(Unreal):
             
             level_actor.set_actor_label(name)
             self.add_transform_track(track, actor_binding, start_frame, end_frame, True)
+            
+            if track["disable_physics"]:
+                self.add_disable_physics(level_sequence, actor_path, actor_binding, (start_frame, end_frame))
              
             if is_spawnable:   
                 ls_system.convert_to_spawnable(actor_binding)

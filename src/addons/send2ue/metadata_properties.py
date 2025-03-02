@@ -89,6 +89,11 @@ class Send2UeSequencerActorProperties(bpy.types.PropertyGroup):
         description = "Used if actor has a mesh component that is translated from the root scene component. This is in unreal units",
     )
     
+    disable_physics : bpy.props.BoolProperty(
+        name = "Disable Physics",
+        description = "Disables physics using an event at start and end of track"
+    )
+    
     def get_path(self):
         if self.actor_category == "Spawnable":
             return self.actor_asset_path
@@ -97,6 +102,7 @@ class Send2UeSequencerActorProperties(bpy.types.PropertyGroup):
     
     def draw(self, layout):
         layout.prop(self, "export_transforms")
+        layout.prop(self, "disable_physics")
         layout.prop(self, "location_offset")
         layout.prop(self, "rotation_offset")
         layout.prop(self, "actor_category")
