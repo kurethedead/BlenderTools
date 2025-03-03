@@ -65,7 +65,7 @@ def assign_custom_metadata(properties : "Send2UeSceneProperties"):
         parent = get_highest_ancestor(obj)
         if parent and parent.type == "ARMATURE":
             if parent not in armature_dict:
-                armature_dict[parent] = ArmatureMetadata.create_armature_metadata(parent.data, properties)
+                armature_dict[parent] = ArmatureMetadata.create_armature_metadata(parent, properties)
             metadata["armature"] = armature_dict[parent]
             
         # TODO: For combine mesh, this results in a random mesh's properties being chosen?

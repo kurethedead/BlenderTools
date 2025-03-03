@@ -9,8 +9,9 @@ class ArmatureMetadata():
     observable_sections : list[str] # bone names
     
     @staticmethod
-    def create_armature_metadata(armature : bpy.types.Armature, properties : "Send2UeSceneProperties") -> 'ArmatureMetadata':
-        armature_prop : Send2UeArmatureProperties = armature.send2ue_armature
+    def create_armature_metadata(armature_obj : bpy.types.Object, properties : "Send2UeSceneProperties") -> 'ArmatureMetadata':
+        armature = armature_obj.data
+        armature_prop : Send2UeArmatureProperties = armature_obj.send2ue_armature
         if armature_prop.category == "None":
             return ArmatureMetadata("None", [])
         elif armature_prop.category == "Observable":
