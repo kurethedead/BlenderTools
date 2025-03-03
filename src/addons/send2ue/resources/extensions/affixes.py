@@ -45,7 +45,10 @@ def add_affixes():
         rename_all_textures(texture_images, append_affix, properties)
 
     for rig_object in rig_objects:
-        actions = utilities.get_actions(rig_object, properties.export_all_actions)
+        # Hack: we override properties.export_all_actions arg in utilities.get_actions, 
+        # since animation + level sequence exports mess with track mute values.
+        # This doesn't seem to be an issue, since affixes are designed to be undone afterward anyway.
+        actions = utilities.get_actions(rig_object, True)
         if rig_object.animation_data:
             if rig_object.animation_data.action:
                 if rig_object.animation_data.action.library is None: # ignore linked actions
@@ -79,7 +82,10 @@ def remove_affixes():
         rename_all_textures(texture_images, discard_affix, properties)
 
     for rig_object in rig_objects:
-        actions = utilities.get_actions(rig_object, properties.export_all_actions)
+        # Hack: we override properties.export_all_actions arg in utilities.get_actions, 
+        # since animation + level sequence exports mess with track mute values.
+        # This doesn't seem to be an issue, since affixes are designed to be undone afterward anyway.
+        actions = utilities.get_actions(rig_object, True)
         if rig_object.animation_data:
             if rig_object.animation_data.action:
                 if rig_object.animation_data.action.library is None: # ignore linked actions
