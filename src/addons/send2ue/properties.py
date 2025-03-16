@@ -544,6 +544,10 @@ def get_scene_property_class():
             name = "Use sequencer events instead of animation sections",
             description="Sequence exports will use even triggers to play animations instead of using animation sections"
         )
+        ignore_textures: bpy.props.BoolProperty(
+            name = "Don't export textures",
+            description="Don't export textures"
+        )
 
     return Send2UeSceneProperties
 

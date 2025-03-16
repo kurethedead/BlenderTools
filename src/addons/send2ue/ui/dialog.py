@@ -64,6 +64,7 @@ class Send2UnrealDialog(bpy.types.Panel):
         :param layout: The layout container for this tab.
         """
         properties = bpy.context.scene.send2ue
+        self.draw_property(properties, layout, 'ignore_textures')
         self.draw_property(properties, layout, 'use_object_origin')
         self.draw_property(properties, layout, 'export_object_name_as_root')
         self.draw_property(properties, layout, 'export_level_sequence')

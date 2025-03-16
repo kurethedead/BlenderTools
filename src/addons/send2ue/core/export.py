@@ -919,7 +919,8 @@ def create_asset_data(properties):
     hair_data = create_groom_data(hair_objects, properties)
     
     # get all textures, merge asset data into mesh asset data
-    create_texture_data(mesh_objects, mesh_data, properties)
+    if not properties.ignore_textures:
+        create_texture_data(mesh_objects, mesh_data, properties)
     
     # get level sequence data
     level_sequence_data = create_level_sequence_data(rig_objects, mesh_objects, properties)
