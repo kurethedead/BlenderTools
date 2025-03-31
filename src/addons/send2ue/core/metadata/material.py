@@ -73,6 +73,7 @@ class MaterialMetadata():
             vector_inputs[label] = vector_input
             return vector_input
     
+    # Note that input prefixed nodes do not have to be connected to anything to export.
     @staticmethod
     def create_material_metadata(material : bpy.types.Material, properties : "Send2UeSceneProperties") -> 'MaterialMetadata':
         scalar_inputs : dict[str, ScalarInputMetadata] = {}

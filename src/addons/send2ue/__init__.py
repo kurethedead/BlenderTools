@@ -5,7 +5,7 @@ import os
 import importlib
 from . import operators, properties, constants
 from .dependencies import remote_execution, unreal
-from .ui import header_menu, addon_preferences, file_browser, dialog
+from .ui import header_menu, addon_preferences, file_browser, dialog, side_menu
 from .core import formatting, validations, settings, utilities, export, ingest, extension, io
 
 bl_info = {
@@ -59,6 +59,8 @@ def register():
 
         # register the header menu
         header_menu.register()
+        
+        side_menu.register()
 
         # register the addon preferences
         addon_preferences.register()
@@ -87,6 +89,8 @@ def unregister():
 
         # unregister the header menu
         header_menu.unregister()
+        
+        side_menu.unregister()
 
         # register the addon preferences
         addon_preferences.unregister()
