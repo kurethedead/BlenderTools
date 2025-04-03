@@ -22,7 +22,7 @@ class Send2UE_AddSockets(bpy.types.Operator):
                 print(child.name)
                 name = child.name
                 socket_name = f"SOCKET_{name}"
-                if socket_name not in [i.name for i in parent.children]:
+                if not name.startswith("SOCKET_") and socket_name not in [i.name for i in parent.children]:
                     empty = bpy.data.objects.new(socket_name, None)  # Create new empty object
                     parent.users_collection[0].objects.link(empty)  # Link empty to the current object's collection
                     empty.empty_display_type = 'SPHERE'
