@@ -81,7 +81,8 @@ class MaterialMetadata():
         
         texture_prefix = get_texture_affix(properties)
         
-        for node in material.node_tree.nodes:
+        nodes = material.node_tree.nodes if material.node_tree else []
+        for node in nodes:
             # Find Ucupaint group
             if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0: 
                 

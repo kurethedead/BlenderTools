@@ -590,7 +590,8 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                     material = obj.material_slots[i].material
                     if material not in materials:
                         materials.append(material)
-                        for node in material.node_tree.nodes:
+                        nodes = material.node_tree.nodes if material.node_tree else []
+                        for node in nodes:
 
                             # Handle Ucupaint group nodes
                             if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:          
