@@ -595,12 +595,13 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
 
                             # Handle Ucupaint group nodes
                             if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:          
-                                image_dict = get_baked_images(node.node_tree)
+                                image_dict = metadata.get_baked_images(node.node_tree)
 
                                 # Save baked images
-                                for channel, image in image_dict.items():
-                                    if channel in UCUPAINT_IGNORE_BAKED:
+                                for channel, image_node in image_dict.items():
+                                    if image_node.image is None or channel in UCUPAINT_IGNORE_BAKED:
                                         continue
+                                    image = image_node.image
                                     image_name = image.name
                                     if image_name.startswith(f"{UCUPAINT_TITLE} "):
                                         image_name = image_name[len(f"{UCUPAINT_TITLE} "):]
@@ -632,13 +633,6 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                 'skip': False
             }
             previous_asset_names.append(asset_name)
-
-def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Image]:
-    image_dict = {}
-    for node in node_tree.nodes:
-        if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked " and node.image:
-            image_dict[node.label[len("Baked "):]] = node.image
-    return image_dict
     
 def get_other_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Image]:
     image_dict = {}

@@ -25,8 +25,14 @@ def unreal_image_name(name : str) -> str:
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
     image_dict = {}
     for node in node_tree.nodes:
-        if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked ":
-            image_dict[node.label[len("Baked "):]] = node
+        # Get ouput group, and get all image nodes connected to output group
+        if node.type == "GROUP_OUTPUT":
+            for socket in [n for n in node.inputs if n and n.name != ""]:
+                for link in socket.links:
+                    if link.from_node and link.from_node.type == "TEX_IMAGE":
+                        image_dict[socket.name] = link.from_node              
+        #if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked ":
+        #    image_dict[node.label[len("Baked "):]] = node
     return image_dict
 
 # Usually, properties = bpy.context.scene.send2ue
