@@ -30,9 +30,11 @@ def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.Text
             for socket in [n for n in node.inputs if n and n.name != ""]:
                 for link in socket.links:
                     if link.from_node and link.from_node.type == "TEX_IMAGE":
-                        image_dict[socket.name] = link.from_node              
-        #if node.type == "TEX_IMAGE" and node.label[:len("Baked ")] == "Baked ":
-        #    image_dict[node.label[len("Baked "):]] = node
+                        image_dict[socket.name] = link.from_node       
+        # Handle normal separately, since there are some intermediate nodes between image and group output 
+        # TODO: Do we want to explicitly handle other normal map types that are ignored in UCUPAINT_IGNORE_BAKED? 
+        if node.type == "TEX_IMAGE" and node.label == "Baked Normal":
+            image_dict[node.label[len("Baked "):]] = node
     return image_dict
 
 # Usually, properties = bpy.context.scene.send2ue
