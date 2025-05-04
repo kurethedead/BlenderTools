@@ -897,12 +897,17 @@ def create_asset_data(properties):
     rig_objects = utilities.get_from_collection(BlenderTypes.SKELETON)
     hair_objects = utilities.get_hair_objects(properties)
 
+    pre_filter_mesh_count = len(mesh_objects)
+
     # filter the rigs and meshes based on the extension filter methods
     rig_objects, mesh_objects, hair_objects = extension.run_extension_filters(
         rig_objects,
         mesh_objects,
         hair_objects
     )
+    
+    if len(mesh_objects) == 0 and pre_filter_mesh_count > 0:
+        print(f"All mesh objects filtered. If you are exporting a skeletal mesh, make sure the armature is not hidden in viewport.\n")
 
     # get the asset data for all the mesh objects
     mesh_data = create_mesh_data(mesh_objects, rig_objects, properties)
