@@ -1456,6 +1456,14 @@ class UnrealRemoteCalls:
         parser.read(config_path)
 
         return parser.get(section_name, setting_name, fallback=None)
+    
+    @staticmethod
+    def is_using_legacy_fbx_importer():
+        if float(unreal.SystemLibrary.get_engine_version().split('-')[0].rsplit('.',1)[0]) >= 5.5:
+            value = unreal.SystemLibrary.get_console_variable_string_value(r'Interchange.FeatureFlags.Import.FBX')
+            return value.lower() in ['false', '0']
+        else:
+            return True
 
     @staticmethod
     def has_socket(asset_path, socket_name):

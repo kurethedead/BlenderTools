@@ -238,8 +238,9 @@ def export_mesh(asset_id, mesh_object, properties, lod=0):
     set_parent_rig_selection(mesh_object, properties)
 
     # select collision meshes
-    asset_name = utilities.get_asset_name(mesh_object.name, properties)
-    utilities.select_asset_collisions(asset_name, properties)
+    if lod == 0:
+        asset_name = utilities.get_asset_name(mesh_object.name, properties)
+        utilities.select_asset_collisions(asset_name, properties)
 
     # Note: this is a weird work around for morph targets not exporting when
     # particle systems are on the mesh. Making them not visible fixes this bug
@@ -939,8 +940,8 @@ def send2ue(properties):
     utilities.escape_local_view()
 
     # clear the asset_data and current id
-    bpy.context.window_manager.send2ue.asset_id = ''
-    bpy.context.window_manager.send2ue.asset_data.clear()
+    bpy.context.window_manager.send2ue.asset_id = '' # type: ignore
+    bpy.context.window_manager.send2ue.asset_data.clear() # type: ignore
 
     # if there are no failed validations continue
     validation_manager = validations.ValidationManager(properties)
@@ -948,3 +949,5 @@ def send2ue(properties):
         # create the asset data
         create_asset_data(properties)
         ingest.assets(properties)
+
+    bpy.context.window_manager.send2ue.object_collection_override.clear() # type: ignore

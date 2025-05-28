@@ -70,7 +70,7 @@ class Send2UnrealDialog(bpy.types.Panel):
         self.draw_property(properties, layout, 'export_level_sequence')
         self.draw_property(properties, layout, 'sequencer_scene_scale')
         self.draw_property(properties, layout, 'sequencer_anims_as_events')
-        
+        self.draw_property(properties, layout, 'export_custom_root_name', enabled=not properties.export_object_name_as_root)
 
         #  animation settings box
         self.draw_expanding_section(

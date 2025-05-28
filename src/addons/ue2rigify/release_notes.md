@@ -1,6 +1,6 @@
 ## Patch Changes
-* Extensions compliance - Avoid data.objects iteration
-  * [72](https://github.com/poly-hammer/BlenderTools/pull/72)
+* Added template for UEFN Mannequin
+  * [111](https://github.com/poly-hammer/BlenderTools/pull/111)
 
 ## Special Thanks
 * @JoshQuake

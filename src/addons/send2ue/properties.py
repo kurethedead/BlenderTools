@@ -2,11 +2,17 @@
 
 import os
 import sys
-import uuid
 import bpy
 from .constants import ToolInfo, PathModes, Template
 from .core import settings, formatting, extension
 from .metadata_properties import register_metadata_properties, unregister_metadata_properties
+
+class ExtensionFolder(bpy.types.PropertyGroup):
+    folder_path: bpy.props.StringProperty(
+        default='',
+        description='The folder location of the extension repo.',
+        subtype='FILE_PATH'
+    ) # type: ignore
 
 
 class Send2UeAddonProperties:
@@ -17,14 +23,6 @@ class Send2UeAddonProperties:
         name="Automatically create pre-defined collections",
         default=True,
         description=f"This automatically creates the pre-defined collection (Export)"
-    )
-    extensions_repo_path: bpy.props.StringProperty(
-        name="Extensions Repo Path",
-        default="",
-        description=(
-            "Set this path to the folder that contains your Send to Unreal python extensions. All extensions "
-            "in this folder will be automatically loaded"
-        )
     )
     # ------------- Remote Execution settings ------------------
     rpc_response_timeout: bpy.props.IntProperty(
@@ -63,11 +61,17 @@ class Send2UeAddonProperties:
         )
     )
 
+    extension_folder_list: bpy.props.CollectionProperty(type=ExtensionFolder) # type: ignore
+    extension_folder_list_active_index: bpy.props.IntProperty() # type: ignore
+
 
 class Send2UeWindowMangerProperties(bpy.types.PropertyGroup):
     """
     This class holds the properties for a window.
     """
+    # This can be set programmatically to override the default collection behavior.
+    # This is cleared back to an empty list after the send2ue operation has completed.
+    object_collection_override = []
     # ------------- current asset info ------------------
     asset_data = {}
     asset_id: bpy.props.StringProperty(
@@ -301,6 +305,14 @@ def get_scene_property_class():
             description=(
                 "If true, this uses the armature object's name in blender as the root bone name in Unreal, otherwise "
                 "the first bone in the armature hierarchy is used as the root bone in unreal."
+            )
+        )
+        export_custom_root_name: bpy.props.StringProperty(
+            name="Custom root bone name",
+            default="",
+            description=(
+                "If specified, this adds a root bone by this name in Unreal. This overrides the "
+                "\"Export object name as root bone\" setting."
             )
         )
         export_custom_property_fcurves: bpy.props.BoolProperty(

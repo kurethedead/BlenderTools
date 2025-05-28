@@ -12,6 +12,7 @@
 
 Extensions provide a python interface for Send to Unreal users to quickly and cleanly extend its functionality
 with a minimal amount of code. Within an extension class several things can be defined:
+
 * [Tasks](#tasks)
 * [Properties](#properties)
 * [Draws](#draws)
@@ -80,7 +81,18 @@ Then in the Send to Unreal addon preferences set the `Extensions Repo Folder` to
     Alternatively, this can be installed with python:
   ```python
   # this is handy for reloading your changes as you develop extensions
-  bpy.context.preferences.addons['send2ue'].preferences.extensions_repo_path = 'C:\extension_repo'
+  import bpy 
+  from pathlib import Path
+  
+  my_extension_folder = r'C:\extension_repo'
+  preferences = bpy.context.preferences.addons['send2ue'].preferences
+  for extension_folder in preferences.extension_folder_list:
+      if Path(extension_folder.folder_path) == Path(my_extension_folder):
+          break
+  else:
+      extension_folder = preferences.extension_folder_list.add()
+      extension_folder.folder_path = my_extension_folder
+  
   bpy.ops.send2ue.reload_extensions()
   ```
 
