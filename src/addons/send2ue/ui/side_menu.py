@@ -1,6 +1,7 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 import bpy
 from bpy.utils import register_class, unregister_class
+from mathutils import Matrix
 
 class Send2UE_AddSockets(bpy.types.Operator):
     # set bl_ properties
@@ -28,12 +29,40 @@ class Send2UE_AddSockets(bpy.types.Operator):
                     empty.empty_display_type = 'SPHERE'
                     empty.empty_display_size = size
                     empty.parent = parent
-                    empty.matrix_local = child.matrix_local
+                    empty.matrix_local = Matrix.Translation(child.matrix_local.decompose()[0])
                 add_sockets(child, size)
 
         objects = bpy.context.view_layer.objects.selected[:]
         for obj in objects:   
             add_sockets(obj, self.socket_size)
+        
+        return {'FINISHED'}
+    
+class Send2UE_RemoveSockets(bpy.types.Operator):
+    # set bl_ properties
+    bl_description = 'Remove sockets at each child object for all selected objects'
+    bl_idname = "object.send2ue_remove_socket_hierarchy"
+    bl_label = "Remove Sockets"
+    bl_options = {"REGISTER", "UNDO", "PRESET"}
+
+    # Called on demand (i.e. button press, menu item)
+    # Can also be called from operator search menu (Spacebar)
+    def execute(self, context):
+        if context.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+            
+        def remove_sockets(parent : bpy.types.Object):
+            children = parent.children[:]
+            for child in children:
+                name = child.name
+                if name.startswith("SOCKET_") and child.data is None:
+                    bpy.data.objects.remove(child)
+                else:
+                    remove_sockets(child)
+
+        objects = bpy.context.view_layer.objects.selected[:]
+        for obj in objects:   
+            remove_sockets(obj)
         
         return {'FINISHED'}
 
@@ -53,8 +82,9 @@ class Send2UE_ToolsPanel(bpy.types.Panel):
     def draw(self, context):
         col = self.layout.column()
         add_sockets = col.operator(Send2UE_AddSockets.bl_idname)
+        remove_sockets = col.operator(Send2UE_RemoveSockets.bl_idname)
         
-classes = [Send2UE_ToolsPanel, Send2UE_AddSockets]
+classes = [Send2UE_ToolsPanel, Send2UE_AddSockets, Send2UE_RemoveSockets]
 
 def register():
     for cls in classes:
