@@ -550,6 +550,8 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
 
     previous_asset_names = []
     all_images_file_paths = []
+    
+    unfiltered_mesh_objs = utilities.get_from_collection(BlenderTypes.MESH)
 
     # get the asset data for the scene objects
     for mesh_object in mesh_objects:
@@ -584,7 +586,7 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
             # then in ingest.import_asset() we filter out repeat textures to avoid multiple imports.
             objects_to_process = [mesh_object]
             if mesh_object.parent and mesh_object.parent.type in ["EMPTY", "ARMATURE"]:
-                objects_to_process = [obj for obj in mesh_object.parent.children_recursive if obj.type == "MESH"]
+                objects_to_process = [obj for obj in mesh_object.parent.children_recursive if obj in unfiltered_mesh_objs]
 
             for obj in objects_to_process:
                 for i in range(len(obj.material_slots)):
@@ -610,7 +612,10 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                                     # Remove image extension beforehand, since we dont know if name contains extension or not
                                     filepath = f"{directory}\\{texture_prefix}{remove_image_ext(image_name)}.{fmt}"
                                     if filepath not in all_images_file_paths:
+                                        is_generated = image.source == "GENERATED"
                                         image.save(filepath = filepath)
+                                        if is_generated:
+                                            image.source = "GENERATED" # saving sets source to "FILE", should revert
                                         all_images_file_paths.append(filepath)
                                     images_file_paths.append(filepath)
 
@@ -622,7 +627,10 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                                     # Remove image extension beforehand, since we dont know if name contains extension or not
                                     filepath = f"{directory}\\{texture_prefix}{remove_image_ext(node.image.name)}.{fmt}"
                                     if filepath not in all_images_file_paths:
+                                        is_generated = node.image.source == "GENERATED"
                                         node.image.save(filepath = filepath)
+                                        if is_generated:
+                                            node.image.source = "GENERATED" # saving sets source to "FILE", should revert
                                         all_images_file_paths.append(filepath)
                                     #node.image.save(filepath = f"{directory}\\{material.name}_{channel}.{fmt}")
                                     images_file_paths.append(filepath)

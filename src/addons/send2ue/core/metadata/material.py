@@ -24,17 +24,39 @@ def unreal_image_name(name : str) -> str:
 
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
     image_dict = {}
-    for node in node_tree.nodes:
-        # Get ouput group, and get all image nodes connected to output group
-        if node.type == "GROUP_OUTPUT":
-            for socket in [n for n in node.inputs if n and n.name != ""]:
-                for link in socket.links:
-                    if link.from_node and link.from_node.type == "TEX_IMAGE":
-                        image_dict[socket.name] = link.from_node       
-        # Handle normal separately, since there are some intermediate nodes between image and group output 
-        # TODO: Do we want to explicitly handle other normal map types that are ignored in UCUPAINT_IGNORE_BAKED? 
-        if node.type == "TEX_IMAGE" and node.label == "Baked Normal":
-            image_dict[node.label[len("Baked "):]] = node
+    
+    # If "Packed" is in the name of any bake targets, then we will ignore regular baked maps.
+    is_packed_channels = False
+    for bake_target in node_tree.yp.bake_targets:
+        if "Packed" in bake_target.name:
+            is_packed_channels = True
+            break
+    
+    if is_packed_channels:
+        for bake_target in node_tree.yp.bake_targets:
+            # Name of map will be all text after "Packed"
+            if "Packed" in bake_target.name:
+                map_name = bake_target.name[bake_target.name.index("Packed") + 6:].strip()
+            # If not "Packed", then attempt to remove node tree name prefix
+            elif bake_target.name.index(node_tree.name) == 0:
+                map_name = bake_target.name[len(node_tree.name):].strip()
+            else:
+                map_name = bake_target.name
+            image_dict[map_name] = node_tree.nodes[bake_target.image_node]
+     
+    else:       
+        for node in node_tree.nodes:
+            # Get ouput group, and get all image nodes connected to output group
+            if node.type == "GROUP_OUTPUT":
+                for socket in [n for n in node.inputs if n and n.name != ""]:
+                    for link in socket.links:
+                        if link.from_node and link.from_node.type == "TEX_IMAGE":
+                            image_dict[socket.name] = link.from_node       
+            # Handle normal separately, since there are some intermediate nodes between image and group output 
+            # TODO: Do we want to explicitly handle other normal map types that are ignored in UCUPAINT_IGNORE_BAKED? 
+            if node.type == "TEX_IMAGE" and node.label == "Baked Normal":
+                image_dict[node.label[len("Baked "):]] = node
+                
     return image_dict
 
 # Usually, properties = bpy.context.scene.send2ue
@@ -111,15 +133,15 @@ class MaterialMetadata():
                         channel_name = channel if channel != "Color" else "Base Color" # Make consistent with Principled BSDF
                         if len(image_node.outputs[0].links) > 0:
                             socket_type = image_node.outputs[0].links[0].to_socket.type
-                            image_name = texture_prefix + unreal_image_name(image_node.image.name[len("Ucupaint "):])
-                            if socket_type == "RGBA" or socket_type == "VECTOR":
-                                MaterialMetadata.get_vector(vector_inputs, channel_name).texture_name = image_name
-                            elif socket_type == "VALUE":
-                                MaterialMetadata.get_scalar(scalar_inputs, channel_name).texture_name = image_name
-                            else:
-                               print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
                         else:
-                            print(f"Baked image {image_node.label} not connected to an output, skipping.\n")
+                            socket_type = "RGBA"
+                        image_name = texture_prefix + unreal_image_name(image_node.image.name[len("Ucupaint "):])
+                        if socket_type == "RGBA" or socket_type == "VECTOR":
+                            MaterialMetadata.get_vector(vector_inputs, channel_name).texture_name = image_name
+                        elif socket_type == "VALUE":
+                            MaterialMetadata.get_scalar(scalar_inputs, channel_name).texture_name = image_name
+                        else:
+                           print(f"Skipping baked image due to invalid output connection: {image_node.label}\n")
             
             # Handle node wrangler / flagged texture nodes
             elif node.type == "TEX_IMAGE":
