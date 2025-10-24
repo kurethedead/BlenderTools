@@ -1,7 +1,7 @@
 import bpy, json
 from dataclasses import dataclass, asdict, field
 from typing import Any
-from .material import MaterialMetadata, VectorInputMetadata, ScalarInputMetadata, get_texture_affix, get_baked_images
+from .material import MaterialMetadata, VectorInputMetadata, ScalarInputMetadata, get_texture_affix, get_baked_images, has_packed_textures
 from .armature import ArmatureMetadata
 from .mesh import MeshMetadata
 from ..texture_constants import INVALID_FILENAME_CHARS

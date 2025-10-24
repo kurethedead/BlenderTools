@@ -22,15 +22,17 @@ def unreal_image_name(name : str) -> str:
         name = name.replace(c, "_")
     return name
 
+def has_packed_textures(node_tree):
+    for bake_target in node_tree.yp.bake_targets:
+        if "Packed" in bake_target.name:
+            return True
+    return False
+
 def get_baked_images(node_tree : bpy.types.NodeTree) -> dict[str, bpy.types.TextureNodeImage]:
     image_dict = {}
     
     # If "Packed" is in the name of any bake targets, then we will ignore regular baked maps.
-    is_packed_channels = False
-    for bake_target in node_tree.yp.bake_targets:
-        if "Packed" in bake_target.name:
-            is_packed_channels = True
-            break
+    is_packed_channels = has_packed_textures(node_tree)
     
     if is_packed_channels:
         for bake_target in node_tree.yp.bake_targets:

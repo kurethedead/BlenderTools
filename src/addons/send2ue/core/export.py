@@ -621,7 +621,9 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
 
                             # Handle node wrangler or prefixed image nodes               
                             if node.type == "TEX_IMAGE":
-                                if node.image and node.label in NODE_WRANGLER_TEXTURES or node.label.find(INPUT_PREFIX) == 0:
+                                # Ignore node wrangler textures when we are packing textures
+                                is_node_wrangler_tex = node.label in NODE_WRANGLER_TEXTURES and not metadata.has_packed_textures(node.node_tree)
+                                if node.image and is_node_wrangler_tex or node.label.find(INPUT_PREFIX) == 0:
                                     #channel = node.label if node.label in NODE_WRANGLER_TEXTURES else node.label[len(INPUT_PREFIX):]
                                     fmt = get_image_ext(node.image.file_format)
                                     # Remove image extension beforehand, since we dont know if name contains extension or not
