@@ -594,8 +594,16 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                     if material not in materials:
                         materials.append(material)
                         nodes = material.node_tree.nodes if material.node_tree else []
+                        
+                        # pre process for detecting packed textures
+                        has_packed_textures = False
                         for node in nodes:
-
+                            if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:
+                                if metadata.has_packed_textures(node.node_tree):
+                                    has_packed_textures = True
+                                    break
+                        
+                        for node in nodes:
                             # Handle Ucupaint group nodes
                             if node.type == "GROUP" and node.node_tree.name.find("Ucupaint") >= 0 and node.node_tree.yp.use_baked:          
                                 image_dict = metadata.get_baked_images(node.node_tree)
@@ -622,7 +630,7 @@ def create_texture_data(mesh_objects, mesh_asset_data, properties):
                             # Handle node wrangler or prefixed image nodes               
                             if node.type == "TEX_IMAGE":
                                 # Ignore node wrangler textures when we are packing textures
-                                is_node_wrangler_tex = node.label in NODE_WRANGLER_TEXTURES and not metadata.has_packed_textures(node.node_tree)
+                                is_node_wrangler_tex = node.label in NODE_WRANGLER_TEXTURES and not has_packed_textures
                                 if node.image and is_node_wrangler_tex or node.label.find(INPUT_PREFIX) == 0:
                                     #channel = node.label if node.label in NODE_WRANGLER_TEXTURES else node.label[len(INPUT_PREFIX):]
                                     fmt = get_image_ext(node.image.file_format)
