@@ -1,9 +1,9 @@
 ## Patch Changes
-* Fixed traceback error (missing comma)
-  * [152](https://github.com/poly-hammer/BlenderTools/pull/152)
+* Lowered aggressiveness of socket names
+  * [173](https://github.com/poly-hammer/BlenderTools/issues/173)
 
 ## Special Thanks
-@Kamushekp
+@Daerst
 
 ## Tests Passing On
 * Blender `3.6`, `4.2` (installed from blender.org)
