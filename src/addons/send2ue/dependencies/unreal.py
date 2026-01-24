@@ -1112,7 +1112,7 @@ class UnrealImportLevelSequence(Unreal):
                 frame_range = track["frame_range"]
                 anim_section.set_range(*frame_range)
                 anim_section.params.set_editor_property("force_custom_mode", track["force_custom_mode"])
-                anim_section.params.set_editor_property("play_rate", track["play_rate"])
+                anim_section.params.set_editor_property("play_rate", unreal.MovieSceneTimeWarpVariant(track["play_rate"]))
                 anim_section.params.set_editor_property("reverse", track["reverse"])
                 anim_section.params.set_editor_property("skip_anim_notifiers", track["skip_anim_notifiers"])
                 anim_section.params.set_editor_property("slot_name", track["slot_name"])
