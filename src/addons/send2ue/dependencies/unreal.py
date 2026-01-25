@@ -1191,15 +1191,17 @@ class UnrealImportLevelSequence(Unreal):
   
         # create sequence
         sequence_name = self.asset_data["sequence_name"]
-        level_sequence = unreal.AssetTools.create_asset(asset_tools, asset_name = sequence_name, 
-            package_path = self.asset_data["asset_folder"], asset_class = unreal.LevelSequence, factory = unreal.LevelSequenceFactoryNew())
-        
-        #loaded_asset = unreal.load_asset(self.asset_data["asset_path"])
-        #if loaded_asset:
-        #    unreal.EditorAssetLibrary.consolidate_assets(level_sequence, [loaded_asset])
-        #    #unreal.AssetTools.rename_assets([unreal.AssetRenameData(level_sequence, "/Game/", sequence_name)])
-        #    unreal.EditorUtilityLibrary.rename_asset(level_sequence, sequence_name)
-            
+        loaded_asset = unreal.load_asset(self.asset_data["asset_path"])
+        if loaded_asset:
+            #unreal.AssetTools.rename_assets([unreal.AssetRenameData(level_sequence, "/Game/", sequence_name)])
+            unreal.EditorUtilityLibrary.rename_asset(loaded_asset, sequence_name + "_old")
+            level_sequence = unreal.AssetTools.create_asset(asset_tools, asset_name = sequence_name, 
+                package_path = self.asset_data["asset_folder"], asset_class = unreal.LevelSequence, factory = unreal.LevelSequenceFactoryNew())
+            unreal.EditorAssetLibrary.consolidate_assets(level_sequence, [loaded_asset])
+        else:
+            level_sequence = unreal.AssetTools.create_asset(asset_tools, asset_name = sequence_name, 
+                package_path = self.asset_data["asset_folder"], asset_class = unreal.LevelSequence, factory = unreal.LevelSequenceFactoryNew())
+               
         unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(level_sequence)
         
         # set sequence params
