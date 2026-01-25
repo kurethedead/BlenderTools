@@ -50,7 +50,7 @@ class Send2UeNlaStripProperties(bpy.types.PropertyGroup):
     completion_mode : bpy.props.EnumProperty(
         name = "Completion Mode",
         items = SCENE_COMPLETION_MODE,
-        default = "PROJECT_DEFAULT",
+        default = "KEEP_STATE",
     )
 
 class Send2UeSequencerActorProperties(bpy.types.PropertyGroup):

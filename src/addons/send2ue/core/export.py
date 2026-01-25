@@ -7,6 +7,7 @@ import bpy, bpy_extras, mathutils
 from . import utilities, validations, settings, ingest, extension, io
 from ..constants import BlenderTypes, UnrealTypes, FileTypes, PreFixToken, ToolInfo, ExtensionTasks
 from . import metadata
+from typing import List, Tuple, Optional, TYPE_CHECKING, Any
 
 from .texture_constants import *
 
@@ -676,36 +677,58 @@ def create_transform_track() -> dict[str, list]:
         "scale_z" : [],
         "hide" : [],
     }
+    
+# see in bfu_utils in Blender-For-UnrealEngine-Addons 
+def evaluate_camera_position_for_unreal(location_offset : mathutils.Vector, scene_scale : float, camera: bpy.types.Object, previous_euler: mathutils.Euler = mathutils.Euler()) -> Tuple[mathutils.Vector, List[float], mathutils.Vector]:
+    # Get Transform
+    if not isinstance(camera.data, bpy.types.Camera):
+        raise TypeError(f"Object {camera.name} is not a camera")
+
+    unit_scale = scene_scale
+    display_size = camera.data.display_size
+
+    matrix_y = mathutils.Matrix.Rotation(math.radians(90.0), 4, 'Y')
+    matrix_x = mathutils.Matrix.Rotation(math.radians(-90.0), 4, 'X')
+    matrix: mathutils.Matrix = camera.matrix_world @ matrix_y @ matrix_x
+    loc: mathutils.Vector = matrix.to_translation() * 100 * unit_scale
+    additional_location_for_export = location_offset
+    loc += additional_location_for_export
+    rot: mathutils.Euler = matrix.to_euler("XYZ", previous_euler)
+    scale: mathutils.Vector = matrix.to_scale() * display_size
+
+    loc *= mathutils.Vector([1, -1, 1])
+    array_rotation: mathutils.Euler = mathutils.Euler([math.degrees(rot[0]), math.degrees(rot[1])*-1, math.degrees(rot[2])*-1])  # Roll, Pitch, Yaw: XYZ
+    array_transform: Tuple[mathutils.Vector, mathutils.Euler, mathutils.Vector] = (loc, array_rotation, scale)
+
+    return array_transform
+
+# see in bfu_spline_utils in Blender-For-UnrealEngine-Addons 
+def evaluate_object_position_for_unreal(location_offset : mathutils.Vector, unit_scale : float, obj: bpy.types.Object, previous_euler: mathutils.Euler = mathutils.Euler()) -> Tuple[mathutils.Vector, List[float], mathutils.Vector]:
+    loc, rot, scale = obj.matrix_world.decompose()
+    euler_rot = [math.degrees(n) for n in rot.to_euler()]
+    
+    # Convert to Unreal space: flip Y
+    loc = mathutils.Vector((loc.x, -loc.y, loc.z)) * unit_scale * 100
+    
+    # Invert pitch to compensate Blender's right-handed system
+    euler_rot = mathutils.Euler((euler_rot[0], -euler_rot[1], euler_rot[2]), 'ZYX')
+    
+    return loc, euler_rot, scale
 
 def read_transform_frames(track : dict[str, list], frame : int, obj : "bpy.types.Object", scene_scale : float, rotation_offset : list, location_offset : list, is_camera : bool = False):
-    space_mat = mathutils.Matrix([[0, -1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]) # unreal to blender coords
-    # x = -y
-    # y = -x
-    # z = z
-    
-    camera_mat = mathutils.Matrix([[0, 0, -1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]]) # unreal to blender camera coords
-    # x = -z
-    # y = x
-    # z = y
-    
-    offset_mat = mathutils.Matrix.Translation((-location_offset[0] / (scene_scale * 100), -location_offset[1] / (scene_scale * 100), -location_offset[2] / (scene_scale * 100)))
-    final_mat = space_mat @ obj.matrix_world @ offset_mat
-    final_cam_mat = camera_mat @ final_mat
-
-    loc, rot, scale = (final_mat).decompose()
-    cam_loc, cam_rot, cam_scale = (final_cam_mat).decompose()
-    
-    # Note that for translation we apply the space_mat, but for rotation we also need to handle camera transform differences.
-    rot_offset = mathutils.Euler((-rotation_offset[0], -rotation_offset[1], -rotation_offset[2]), 'XYZ').to_quaternion()
-    actual_rot = (cam_rot if is_camera else rot) @ rot_offset
+    if is_camera:
+        # TODO: Get previous Euler?
+        loc, euler_rot, scale = evaluate_camera_position_for_unreal(location_offset, scene_scale, obj, mathutils.Euler())
+    else:
+        loc, euler_rot, scale = evaluate_object_position_for_unreal(location_offset, scene_scale, obj, mathutils.Euler())
     hide = not obj.hide_viewport
     
-    track["location_x"].append((frame, loc[0] * 100 * scene_scale)) # handle unreal-blender unit scale
-    track["location_y"].append((frame, loc[1] * 100 * scene_scale))
-    track["location_z"].append((frame, loc[2] * 100 * scene_scale))
-    track["rotation_x"].append((frame, math.degrees(actual_rot.to_euler()[0]))) # handle different camera orientation
-    track["rotation_y"].append((frame, math.degrees(actual_rot.to_euler()[1])))
-    track["rotation_z"].append((frame, math.degrees(actual_rot.to_euler()[2])))
+    track["location_x"].append((frame, loc[0]))
+    track["location_y"].append((frame, loc[1]))
+    track["location_z"].append((frame, loc[2]))
+    track["rotation_x"].append((frame, euler_rot[0]))
+    track["rotation_y"].append((frame, euler_rot[1]))
+    track["rotation_z"].append((frame, euler_rot[2]))
     track["scale_x"].append((frame, scale[0]))
     track["scale_y"].append((frame, scale[1]))
     track["scale_z"].append((frame, scale[2]))
