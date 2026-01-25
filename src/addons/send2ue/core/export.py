@@ -678,21 +678,34 @@ def create_transform_track() -> dict[str, list]:
     }
 
 def read_transform_frames(track : dict[str, list], frame : int, obj : "bpy.types.Object", scene_scale : float, rotation_offset : list, location_offset : list, is_camera : bool = False):
-    mm = mathutils.Matrix.Identity(4)
-    mm[1][1] = -1 # handle left vs right hand space
+    space_mat = mathutils.Matrix([[0, -1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]) # unreal to blender coords
+    # x = -y
+    # y = -x
+    # z = z
+    
+    camera_mat = mathutils.Matrix([[0, 0, -1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]]) # unreal to blender camera coords
+    # x = -z
+    # y = x
+    # z = y
     
     offset_mat = mathutils.Matrix.Translation((-location_offset[0] / (scene_scale * 100), -location_offset[1] / (scene_scale * 100), -location_offset[2] / (scene_scale * 100)))
-    loc, rot, scale = (mm @ obj.matrix_world @ offset_mat @ mm.inverted()).decompose()
+    final_mat = space_mat @ obj.matrix_world @ offset_mat
+    final_cam_mat = camera_mat @ final_mat
+
+    loc, rot, scale = (final_mat).decompose()
+    cam_loc, cam_rot, cam_scale = (final_cam_mat).decompose()
     
-    rot = rot @ mathutils.Euler((-rotation_offset[0], -rotation_offset[1], -rotation_offset[2]), 'XYZ').to_quaternion()
+    # Note that for translation we apply the space_mat, but for rotation we also need to handle camera transform differences.
+    rot_offset = mathutils.Euler((-rotation_offset[0], -rotation_offset[1], -rotation_offset[2]), 'XYZ').to_quaternion()
+    actual_rot = (cam_rot if is_camera else rot) @ rot_offset
     hide = not obj.hide_viewport
     
     track["location_x"].append((frame, loc[0] * 100 * scene_scale)) # handle unreal-blender unit scale
     track["location_y"].append((frame, loc[1] * 100 * scene_scale))
     track["location_z"].append((frame, loc[2] * 100 * scene_scale))
-    track["rotation_x"].append((frame, math.degrees(rot.to_euler()[0]) + 90 if is_camera else -math.degrees(rot.to_euler()[0]))) # handle different camera orientation
-    track["rotation_y"].append((frame, math.degrees(rot.to_euler()[1]) if is_camera else -math.degrees(rot.to_euler()[1])))
-    track["rotation_z"].append((frame, math.degrees(rot.to_euler()[2]) - (90 if is_camera else 0)))
+    track["rotation_x"].append((frame, math.degrees(actual_rot.to_euler()[0]))) # handle different camera orientation
+    track["rotation_y"].append((frame, math.degrees(actual_rot.to_euler()[1])))
+    track["rotation_z"].append((frame, math.degrees(actual_rot.to_euler()[2])))
     track["scale_x"].append((frame, scale[0]))
     track["scale_y"].append((frame, scale[1]))
     track["scale_z"].append((frame, scale[2]))
