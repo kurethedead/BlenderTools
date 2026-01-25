@@ -971,12 +971,16 @@ class UnrealImportLevelSequence(Unreal):
         for camera_name, track in cam_tracks.items():
             # Create a cine camera actor
             camera_actor = unreal.EditorLevelLibrary().spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(0,0,0), unreal.Rotator(0,0,0))
+            camera_component = camera_actor.get_cine_camera_component()
+            
+            # TODO: Default disable, maybe add more control to this?
+            camera_component.set_editor_property("focus_settings", unreal.CameraFocusSettings(focus_method = unreal.CameraFocusMethod.DISABLE))
         
             # Add a spawnable using that cine camera actor
             camera_binding = level_sequence.add_possessable(camera_actor)
         
             # Add a cine camera component binding using the component of the camera actor
-            camera_component_binding = level_sequence.add_possessable(camera_actor.get_cine_camera_component())
+            camera_component_binding = level_sequence.add_possessable(camera_component)
             camera_component_binding.set_parent(camera_binding)
         
             camera_component_binding.set_display_name('Camera Component')	
