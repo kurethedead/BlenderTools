@@ -351,7 +351,7 @@ def get_scene_property_class():
         export_level_sequence: bpy.props.BoolProperty(
             name="Export level sequence",
             default=False,
-            description="Whether or not to export level sequence from NLA"
+            description="Whether or not to export level sequence from NLA. This disables mesh export."
         )
         import_meshes: bpy.props.BoolProperty(
             name="Meshes",

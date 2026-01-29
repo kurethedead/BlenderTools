@@ -851,21 +851,24 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
 
 def create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame) -> dict[str,dict[str, list]]:
     obj_transform_tracks = {}
+    
+    transform_objs = [obj for obj in mesh_objects if obj.send2ue_object.actor_prop.export_transforms]
+    for mesh_object in transform_objs:
+        if mesh_object.name not in obj_transform_tracks:
+            transform_track = create_transform_track() | {
+                "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
+                "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
+                "disable_physics" : mesh_object.send2ue_object.actor_prop.disable_physics,
+            }
+            obj_transform_tracks[mesh_object.name] = transform_track
+                
     for i in range(start_frame, end_frame):
         scene.frame_set(i)
-        for mesh_object in [obj for obj in mesh_objects if obj.send2ue_object.actor_prop.export_transforms]:
-            if mesh_object.name not in obj_transform_tracks:
-                transform_track = create_transform_track() | {
-                    "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
-                    "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
-                    "disable_physics" : mesh_object.send2ue_object.actor_prop.disable_physics,
-                }
-                obj_transform_tracks[mesh_object.name] = transform_track
-            utilities.set_all_action_mute_values(mesh_object, mute=False) # un-mute actions since animation export mutes them
+        for mesh_object in transform_objs:
+            #print(f"{mesh_object.matrix_world.decompose()[0]}\n")
             read_transform_frames(obj_transform_tracks[mesh_object.name], i, mesh_object, properties.sequencer_scene_scale, 
                                   mesh_object.send2ue_object.actor_prop.rotation_offset,
                                   mesh_object.send2ue_object.actor_prop.location_offset)
-            utilities.set_all_action_mute_values(mesh_object, mute=True)
     return obj_transform_tracks
 
 def create_level_sequence_data(rig_objects, mesh_objects, properties):
@@ -920,7 +923,12 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
     anim_tracks = create_level_sequence_data_anims(scene, rig_objects, properties, start_frame, end_frame)
 
     # get object animation tracks
+    # unmute rig actions in case mesh objs are parented to bones
+    for rig_object in rig_objects:
+        utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
     obj_transform_tracks = create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame)
+    for rig_object in rig_objects:
+        utilities.set_all_action_mute_values(rig_object, mute=True)
 
     sequence_data[asset_id] = {
         '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
@@ -961,20 +969,28 @@ def create_asset_data(properties):
         hair_objects
     )
     
+    mesh_data = {}
+    hair_data = {}
+    
     if len(mesh_objects) == 0 and pre_filter_mesh_count > 0:
         print(f"All mesh objects filtered. If you are exporting a skeletal mesh, make sure the armature is not hidden in viewport.\n")
 
     # get the asset data for all the mesh objects
-    mesh_data = create_mesh_data(mesh_objects, rig_objects, properties)
+    # Usually for level sequence we want to export object animations but not geometry.
+    if not properties.export_level_sequence:
+        mesh_data = create_mesh_data(mesh_objects, rig_objects, properties)
 
     # get the asset data for all the actions on the rig objects
     animation_data = create_animation_data(rig_objects, properties)
 
     # get the asset data for all the hair systems
-    hair_data = create_groom_data(hair_objects, properties)
+    # Usually for level sequence we want to export object animations but not geometry.
+    if not properties.export_level_sequence:
+        hair_data = create_groom_data(hair_objects, properties)
     
     # get all textures, merge asset data into mesh asset data
-    if not properties.ignore_textures:
+    # Usually for level sequence we want to export object animations but not geometry.
+    if not properties.ignore_textures and not properties.export_level_sequence:
         create_texture_data(mesh_objects, mesh_data, properties)
     
     # get level sequence data

@@ -57,7 +57,9 @@ def assign_custom_metadata(properties : "Send2UeSceneProperties"):
         
         for i in range(len(obj.material_slots)):
             material = obj.material_slots[i].material
-            fix_material_name(material)
+            # Usually for level sequence we want to export object animations but not geometry.
+            if not properties.export_level_sequence:
+                fix_material_name(material)
             metadata["materials"][material.name] = MaterialMetadata.create_material_metadata(material, properties)
          
         # Add armature metadata to mesh if armature is used.
