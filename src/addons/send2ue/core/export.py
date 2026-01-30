@@ -711,7 +711,7 @@ def evaluate_object_position_for_unreal(location_offset : mathutils.Vector, unit
     loc = mathutils.Vector((loc.x, -loc.y, loc.z)) * unit_scale * 100
     
     # Invert pitch to compensate Blender's right-handed system
-    euler_rot = mathutils.Euler((euler_rot[0], -euler_rot[1], euler_rot[2]), 'ZYX')
+    euler_rot = mathutils.Euler((euler_rot[0], -euler_rot[1], -euler_rot[2]))
     
     return loc, euler_rot, scale
 
