@@ -736,7 +736,7 @@ def read_transform_frames(track : dict[str, list], frame : int, obj : "bpy.types
 
 def create_level_sequence_data_cameras(scene, properties, start_frame, end_frame) -> dict[str,dict[str, list]]:
     camera_objs : dict [bpy.types.Object, tuple[float, float]] = {} # camera object to frame range
-    camera_markers = [m for m in scene.timeline_markers if m.camera is not None]
+    camera_markers = sorted([m for m in scene.timeline_markers if m.camera is not None], key = lambda n: n.frame)
     for i, marker in enumerate(camera_markers):
         if i == 0:
             camera_start_frame = start_frame
