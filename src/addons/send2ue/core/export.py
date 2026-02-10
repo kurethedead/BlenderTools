@@ -752,13 +752,15 @@ def create_level_sequence_data_cameras(scene, properties, start_frame, end_frame
     # evaluate transform each frame
     #anim_camera_objs = [obj for obj in camera_objs if obj.animation_data is not None]
     #static_camera_objs = [obj for obj in camera_objs if obj.animation_data is None]
-    transform_tracks : dict[str, object] = {}
+    transform_tracks : dict[Any, object] = {}
     for camera_obj, frame_range in camera_objs.items():
-        transform_tracks[camera_obj.name] = create_transform_track() | {
+        transform_tracks[camera_obj] = create_transform_track() | {
             "frame_range" : frame_range,
             "fov" : [],
-            
         }
+        
+    # Get actual frames later when all objects are collected
+    '''
     for i in range(start_frame, end_frame):
         scene.frame_set(i)
         for camera_obj, frame_range in camera_objs.items():
@@ -767,6 +769,7 @@ def create_level_sequence_data_cameras(scene, properties, start_frame, end_frame
             
             read_transform_frames(track, i, camera_obj, properties.sequencer_scene_scale, mathutils.Vector([0,0,0]), mathutils.Vector([0,0,0]), True)
             track["fov"].append((i, fov))
+    '''
     
     return transform_tracks
 
@@ -779,6 +782,7 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                 obj.animation_data.action = None
 
     anim_tracks = []
+    transform_tracks = {}
     for rig_object in [obj for obj in rig_objects if obj]:
         rig_object.hide_viewport = False # if true, then NLA tracks won't be accessible
         transform_track_saved = False
@@ -820,14 +824,17 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                         
                         if not transform_track_saved and rig_object.send2ue_armature.actor_prop.export_transforms:
                             transform_track_saved = True
-                            utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
+                            #utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
                             transform_track = create_transform_track()
+                            # Get actual frames later when all objects are collected
+                            '''
                             for i in range(start_frame, end_frame):
                                 bpy.context.scene.frame_set(i)
                                 read_transform_frames(transform_track, i, rig_object, properties.sequencer_scene_scale, 
                                                       rig_object.send2ue_armature.actor_prop.rotation_offset,
                                                       rig_object.send2ue_armature.actor_prop.location_offset)
-                            utilities.set_all_action_mute_values(rig_object, mute=True)
+                            '''
+                            #utilities.set_all_action_mute_values(rig_object, mute=True)
                         else:
                             print("No transform track")
                             transform_track = None
@@ -849,27 +856,30 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                             "transform_track" : transform_track,
                             "disable_physics" : rig_object.send2ue_armature.actor_prop.disable_physics,
                         })
+                        transform_tracks[rig_object] = transform_track
                     else:
                         print(f"No action on strip {strip.name} for {rig_object.name}, or its not an armature action")
             else:
                 print(f"No nla track on {rig_object.name}")
         else:
             print(f"{rig_object.name} has no animation data or nla_tracks: {num_tracks} tracks")
-    return anim_tracks
+    return anim_tracks, transform_tracks
 
 def create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame) -> dict[str,dict[str, list]]:
     obj_transform_tracks = {}
     
     transform_objs = [obj for obj in mesh_objects if obj.send2ue_object.actor_prop.export_transforms]
     for mesh_object in transform_objs:
-        if mesh_object.name not in obj_transform_tracks:
+        if mesh_object not in obj_transform_tracks:
             transform_track = create_transform_track() | {
                 "actor_path" : mesh_object.send2ue_object.actor_prop.get_path(),
                 "actor_category" : mesh_object.send2ue_object.actor_prop.actor_category,
                 "disable_physics" : mesh_object.send2ue_object.actor_prop.disable_physics,
             }
-            obj_transform_tracks[mesh_object.name] = transform_track
-                
+            obj_transform_tracks[mesh_object] = transform_track
+    
+    # Get actual frames later when all objects are collected
+    '''            
     for i in range(start_frame, end_frame):
         scene.frame_set(i)
         for mesh_object in transform_objs:
@@ -877,6 +887,7 @@ def create_level_sequence_data_objects(scene, mesh_objects, properties, start_fr
             read_transform_frames(obj_transform_tracks[mesh_object.name], i, mesh_object, properties.sequencer_scene_scale, 
                                   mesh_object.send2ue_object.actor_prop.rotation_offset,
                                   mesh_object.send2ue_object.actor_prop.location_offset)
+    '''
     return obj_transform_tracks
 
 def create_level_sequence_data(rig_objects, mesh_objects, properties):
@@ -924,19 +935,44 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
             continue
         markers.append({"name" : marker.name, "frame" : marker.frame})
         
-    # get camera tracks
+    # get camera tracks, without object transform frame data
     cam_tracks = create_level_sequence_data_cameras(scene, properties, start_frame, end_frame)
     
-    # get armature animation tracks
-    anim_tracks = create_level_sequence_data_anims(scene, rig_objects, properties, start_frame, end_frame)
+    # get armature animation tracks, without object transform frame data
+    anim_tracks, anim_transform_tracks = create_level_sequence_data_anims(scene, rig_objects, properties, start_frame, end_frame)
 
-    # get object animation tracks
+    # get object animation tracks, without object transform frame data
+    obj_transform_tracks = create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame)
+    
     # unmute rig actions in case mesh objs are parented to bones
     for rig_object in rig_objects:
         utilities.set_all_action_mute_values(rig_object, mute=False) # un-mute actions since animation export mutes them
-    obj_transform_tracks = create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame)
+    
+    # Read transforms for all objects
+    for i in range(start_frame, end_frame):
+        scene.frame_set(i)
+        for mesh_object, mesh_track in obj_transform_tracks.items():
+            #print(f"{mesh_object.matrix_world.decompose()[0]}\n")
+            read_transform_frames(mesh_track, i, mesh_object, properties.sequencer_scene_scale, 
+                                  mesh_object.send2ue_object.actor_prop.rotation_offset,
+                                  mesh_object.send2ue_object.actor_prop.location_offset)
+            
+        for anim_object, anim_track in anim_transform_tracks.items():
+            read_transform_frames(anim_track, i, anim_object, properties.sequencer_scene_scale, 
+                                  anim_object.send2ue_armature.actor_prop.rotation_offset,
+                                  anim_object.send2ue_armature.actor_prop.location_offset)
+            
+        for camera_obj, camera_track in cam_tracks.items():
+            fov = math.degrees(camera_obj.data.angle)
+            
+            read_transform_frames(camera_track, i, camera_obj, properties.sequencer_scene_scale, mathutils.Vector([0,0,0]), mathutils.Vector([0,0,0]), True)
+            camera_track["fov"].append((i, fov))
+
     for rig_object in rig_objects:
         utilities.set_all_action_mute_values(rig_object, mute=True)
+        
+    obj_transform_tracks_by_name = {key.name: value for key, value in obj_transform_tracks.items()}
+    cam_tracks_by_name = {key.name: value for key, value in cam_tracks.items()}
 
     sequence_data[asset_id] = {
         '_asset_type': UnrealTypes.LEVEL_SEQUENCE,
@@ -948,9 +984,9 @@ def create_level_sequence_data(rig_objects, mesh_objects, properties):
         'end_frame': end_frame,
         'framerate': framerate,
         'markers' : markers,
-        'cam_tracks' : cam_tracks,
+        'cam_tracks' : cam_tracks_by_name,
         'anim_tracks' : anim_tracks,
-        'obj_tracks' : obj_transform_tracks,
+        'obj_tracks' : obj_transform_tracks_by_name,
         'subsequence_path' : properties.unreal_subsequence_asset_path,
         'sequencer_anims_as_events' : properties.sequencer_anims_as_events
     }
