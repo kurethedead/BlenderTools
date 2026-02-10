@@ -780,6 +780,7 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
 
     anim_tracks = []
     for rig_object in [obj for obj in rig_objects if obj]:
+        rig_object.hide_viewport = False # if true, then NLA tracks won't be accessible
         transform_track_saved = False
         if rig_object.send2ue_armature.actor_prop.get_path() == "":
             print(f"{rig_object.name} does not have an actor path set for its appropriate mode, skipping.")
@@ -828,6 +829,7 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                                                       rig_object.send2ue_armature.actor_prop.location_offset)
                             utilities.set_all_action_mute_values(rig_object, mute=True)
                         else:
+                            print("No transform track")
                             transform_track = None
                         
                         anim_tracks.append({
@@ -847,6 +849,12 @@ def create_level_sequence_data_anims(scene, rig_objects, properties, start_frame
                             "transform_track" : transform_track,
                             "disable_physics" : rig_object.send2ue_armature.actor_prop.disable_physics,
                         })
+                    else:
+                        print(f"No action on strip {strip.name} for {rig_object.name}, or its not an armature action")
+            else:
+                print(f"No nla track on {rig_object.name}")
+        else:
+            print(f"{rig_object.name} has no animation data or nla_tracks: {num_tracks} tracks")
     return anim_tracks
 
 def create_level_sequence_data_objects(scene, mesh_objects, properties, start_frame, end_frame) -> dict[str,dict[str, list]]:
