@@ -403,11 +403,12 @@ def get_from_collection(object_type):
             # if the object is the correct type
             if collection_object.type == object_type:
                 # if the object is visible
-                if collection_object.visible_get():
-                    # ensure the object doesn't end with one of the post fix tokens
-                    if not any(collection_object.name.startswith(f'{token.value}_') for token in PreFixToken):
-                        # add it to the group of objects
-                        collection_objects.append(collection_object)
+                # NOTE: We don't want this, since we are using viewport visibility to animate level sequence visibility
+                #if collection_object.visible_get():
+                # ensure the object doesn't end with one of the post fix tokens
+                if not any(collection_object.name.startswith(f'{token.value}_') for token in PreFixToken):
+                    # add it to the group of objects
+                    collection_objects.append(collection_object)
     return sorted(collection_objects, key=lambda obj: obj.name)
 
 
