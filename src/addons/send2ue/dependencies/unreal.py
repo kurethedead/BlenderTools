@@ -936,6 +936,7 @@ class UnrealImportLevelSequence(Unreal):
         transform_track = binding.add_track(unreal.MovieScene3DTransformTrack)
         transform_section = transform_track.add_section()
         transform_section.set_range(start_frame, end_frame)
+        transform_section.set_editor_property("use_quaternion_interpolation", True)
       
         channel_names = ["location_x", "location_y", "location_z", "rotation_x", "rotation_y", "rotation_z", "scale_x", "scale_y", "scale_z"]
         for i, channel_name in enumerate(channel_names):
